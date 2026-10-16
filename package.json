@@ -1,0 +1,26 @@
+{
+  "name": "claimflow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.2.18",
+  "engines": {
+    "bun": ">=1.2.18"
+  },
+  "scripts": {
+    "dev": "bun --watch scripts/pi-smoke.ts",
+    "smoke": "bun scripts/pi-smoke.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun test"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.3.0",
+    "@earendil-works/pi-coding-agent": "1.3.0",
+    "typebox": "1.3.27"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.3",
+    "typescript": "7.0.2"
+  }
+}
