@@ -6,12 +6,14 @@ not insurer policy. Pi SDK owns the agent loop; the application owns business st
 
 ## Ownership and trust
 
-- `src/sop/types.ts` defines four phases, user statements, tool facts, identity,
-  representative authorization, and email consent as separate types.
+- `src/domain/` defines phases, statements/facts, identity, representative authorization,
+  email consent, cases and document guidance as separate business concepts. Domain modules
+  have no imports from application, adapters, Pi, TypeBox, Bun or environment configuration.
 - A user statement is a hint. Only a server-side verifier can produce active identity
   evidence. Pi messages, summaries, tool arguments, and client state never grant access.
-- `src/tools/contracts.ts` defines business inputs/outputs and server-supplied context.
-  Tool arguments cannot supply a trusted session, identity, state version, or authorization.
+- `src/application/tool-contracts.ts` owns executable input/output schemas and derives the business
+  names and TypeScript contracts from them. Tool arguments cannot supply a trusted
+  session, identity, state version, or authorization.
 - `src/adapters/pi/` hosts Pi with explicit models, credentials, settings, resources,
   and in-memory conversation storage. SQLite business persistence and the running state
   machine are implemented in OPC-158; fixture matching is implemented in OPC-159.
@@ -20,6 +22,15 @@ not insurer policy. Pi SDK owns the agent loop; the application owns business st
 - Business tool execution is sequential and calls a mandatory host authorization closure.
   The host must check the latest phase, identity, grant expiry and case ownership inside
   the same business transaction as the protected read/write. Exposure is an additional filter.
+- `defineBusinessTool` selects schemas by business name. Authors return typed business
+  outcomes; the Pi adapter validates arguments before authorization and validates outcomes
+  before creating text, details and structured content. Invalid results produce a contract
+  error without rejected values. Schemas cannot be overridden, and copied definitions
+  cannot replace guarded execution during registration.
+- `src/domain/claims.ts` owns case invariants and `factsAt(now)`; the fixture codec constructs
+  a domain case and translates errors into safe fixture locations. `src/domain/documents.ts`
+  owns material categories, original requirements and follow-up restrictions. The adapter
+  only translates source keys, text and provenance into a domain guidance catalog.
 
 ## Identity evidence
 
@@ -78,7 +89,8 @@ redundant questions or derive verification from conversation fluency.
 | Authorization waiting time | 30,000 ms | `AUTHORIZATION_TIMEOUT_MS` |
 | Session idle expiry | 1,800,000 ms | `SESSION_IDLE_TIMEOUT_MS` |
 
-`readSopPolicy` validates overrides as positive safe integers. Incomplete identity collection is
+`src/application/config.ts` decodes policy overrides as positive safe integers; policy defaults
+and identity matching rules belong to the domain. Incomplete identity collection is
 not a mismatch. A successful verification resets its failure count. An in-scope turn resets the
 consecutive off-topic count; a mixed turn handles the insurance part and rejects the unrelated part.
 

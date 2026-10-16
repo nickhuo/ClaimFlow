@@ -19,14 +19,23 @@ The smoke uses Pi's fake provider with a real SDK session and tool loop. It perf
 
 `.env.example` lists the proposed business-policy defaults and future real-model settings. Copy it to `.env` when configuring a host; pass the provider, model, token and prompt explicitly to `createSession`. Tokens stay server-side. The current factory creates isolated, in-memory Pi conversations and loads only explicitly registered business tools and host resources.
 
+## Domain-first development
+
+Start a business change with the terms in [GLOSSARY.md](GLOSSARY.md), concrete scenarios and domain invariants. Implement and test the domain behavior, then connect application contracts and adapters. The dependency direction is recorded in [ADR-0001](docs/adr/0001-domain-first.md) and checked by `tests/architecture.test.ts`.
+
+`Case` owns subject ownership, exact amounts, unknown values and appeal-date interpretation. Document guidance owns material equivalence, original requirements and the treatment of unanchored deadlines. Domain code uses pure TypeScript and receives time explicitly. TypeBox, Pi, environment decoding and fixture formats live outside it.
+
 ## Repository contents
 
 - `docs/brief.md`: requirements, workflow, and delivery criteria.
 - `docs/sop-rules.md`: phase boundaries, identity/authorization semantics, recovery and defaults.
 - `fixtures/`: supplied identity, claims, authorization, and document-guidance test data.
-- `src/sop/`: domain types and identity evidence/configuration policy.
-- `src/tools/contracts.ts`: business tool inputs, outputs and phase exposure policy.
+- `GLOSSARY.md` and `docs/adr/`: business vocabulary and architectural decisions.
+- `src/domain/`: identity, authorization, cases, documents, facts and conversation models/rules.
+- `src/application/tool-contracts.ts`: executable business tool schemas, derived contracts and phase exposure policy.
+- `src/application/ports.ts` and `config.ts`: server data/clock requirements and configuration decoding.
+- `src/adapters/fixtures/`: validated fixture loading, subject-scoped reads and document mapping; see [fixture data](docs/fixture-data.md).
 - `src/adapters/pi/`: isolated Pi session factory and guarded business tool registration.
-- `scripts/pi-smoke.ts` and `tests/`: offline SDK smoke and foundation checks.
+- `scripts/pi-smoke.ts` and `tests/`: domain, dependency-direction, fixture and SDK checks.
 
-This is the engineering foundation for OPC-156. Fixture services, the running SOP state machine, complete conversational agent, UI and Docker delivery are implemented in the subsequent Linear tasks.
+OPC-156 and OPC-157 provide the engineering foundation and fixture data adapter. The running SOP state machine, identity matching/authorization, complete conversational agent, UI and Docker delivery are implemented in the subsequent Linear tasks.

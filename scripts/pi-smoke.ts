@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { VERSION } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
 import { createSession } from "../src/adapters/pi/session-factory.ts";
 import { defineBusinessTool } from "../src/adapters/pi/tools.ts";
 
@@ -21,12 +20,11 @@ export async function runPiSmoke(cwd = process.cwd()) {
     name: "record_facts",
     label: "Record caller facts",
     description: "Record this smoke's empty caller facts; returns no protected data.",
-    parameters: Type.Object({ turnId: Type.String(), facts: Type.Object({}) }),
     authorize: () => { authorizations += 1; },
-    async execute(_id, input) {
+    async execute(input) {
       assert.equal(input.turnId, "smoke");
       toolExecutions += 1;
-      return { content: [{ type: "text", text: "Empty facts recorded." }], details: { recorded: true } };
+      return { recorded: true };
     },
   });
   const { session } = await createSession({

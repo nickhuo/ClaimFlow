@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { assessIdentityEvidence, DEFAULT_SOP_POLICY, readSopPolicy } from "../src/sop/policy.ts";
-import type { IdentityEvidence, IdentityField } from "../src/sop/types.ts";
-import { PHASE_TOOLS } from "../src/tools/contracts.ts";
+import { assessIdentityEvidence, type IdentityEvidence, type IdentityField } from "../src/domain/identity.ts";
+import { DEFAULT_SOP_POLICY } from "../src/domain/conversation.ts";
+import { readSopPolicy } from "../src/application/config.ts";
+import { PHASE_TOOLS } from "../src/application/tool-contracts.ts";
 
 function match(field: IdentityField, subjectId = "subject-1"): IdentityEvidence {
   return { origin: "identity_verifier", field, subjectId, outcome: "match" };
