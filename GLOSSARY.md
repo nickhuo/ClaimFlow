@@ -57,3 +57,18 @@ The caller's explicit choice to send a particular version of a conversation summ
 
 **Handoff**:
 A request for a human to continue handling the conversation. A handoff request does not mean a human is already connected or that identity and authorization requirements have been lifted.
+
+**Conversation state**:
+The server's authoritative record of the current SOP phase, identity, authorization, selected case and follow-up choices. A model transcript is not conversation state.
+
+**Originating turn**:
+The authenticated caller message or explicit UI action to which a recorded fact, completion confirmation or email choice belongs. A model cannot manufacture a different confirmation turn.
+
+**Summary version**:
+A monotonically increasing revision of the grounded conversation summary. Returning to case processing invalidates its email consent; a later summary requires a new choice.
+
+**Delivery receipt**:
+The durable status of one logical email request. Pending or unknown status does not prove failure, and submitted status means provider acceptance rather than recipient receipt.
+
+**Idempotency key**:
+The stable delivery identifier reused when retrying the same confirmed summary and recipient, so one logical request does not create duplicate email side effects.
