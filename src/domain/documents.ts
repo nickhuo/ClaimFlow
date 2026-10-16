@@ -2,12 +2,21 @@ import type { CaseFacts, CaseType } from "./claims.ts";
 import type { Intent } from "./conversation.ts";
 import type { DataFact } from "./facts.ts";
 
-export const DOCUMENT_TYPES = ["pathology_report", "office_note", "accident_scene_photos", "repair_estimate"] as const;
+export const DOCUMENT_TYPES = [
+  "pathology_report",
+  "office_note",
+  "accident_scene_photos",
+  "repair_estimate",
+] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
 export const FOLLOWUP_TOPICS = [
-  "missing_required_material_alternatives", "submission_timing", "processing_time_after_submission",
-  "submission_method", "file_format_requirements", "receipt_confirmation",
+  "missing_required_material_alternatives",
+  "submission_timing",
+  "processing_time_after_submission",
+  "submission_method",
+  "file_format_requirements",
+  "receipt_confirmation",
 ] as const;
 
 export interface FollowupGuidance {
@@ -49,11 +58,14 @@ export interface CaseDocumentGuidance {
 export interface GuidanceCatalog {
   readonly general: DataFact<string>;
   readonly caseTypes: ReadonlyMap<CaseType, DataFact<string>>;
-  readonly documents: ReadonlyMap<DocumentType, {
-    readonly referenceKey: string;
-    readonly guidance: DataFact<string>;
-    readonly alternatives: DataFact<string> | null;
-  }>;
+  readonly documents: ReadonlyMap<
+    DocumentType,
+    {
+      readonly referenceKey: string;
+      readonly guidance: DataFact<string>;
+      readonly alternatives: DataFact<string> | null;
+    }
+  >;
   readonly generalAlternatives: DataFact<string>;
   readonly processingTimeEstimate: DataFact<string>;
   readonly humanReview: DataFact<string>;
@@ -75,20 +87,21 @@ export function buildDocumentGuidance(
   caseFacts: Pick<CaseFacts, "caseId" | "caseType" | "documentsNeeded">,
   catalog: GuidanceCatalog,
 ): CaseDocumentGuidance {
-  const documents = caseFacts.documentsNeeded?.map((requestedName): DocumentGuidance => {
-    const type = DOCUMENT_NAMES.get(requestedName);
-    const entry = type === undefined ? undefined : catalog.documents.get(type);
-    return {
-      requestedName,
-      documentType: type ?? null,
-      mapping: type === undefined ? "unmapped" : entry ? "mapped" : "unavailable",
-      guidelineKey: entry?.referenceKey ?? null,
-      originalRequirement: requestedName.startsWith("original ") ? "required" : "not_specified",
-      guidance: entry?.guidance ?? null,
-      alternatives: entry?.alternatives ?? catalog.generalAlternatives,
-      alternativesKind: entry?.alternatives ? "document_specific" : "general",
-    };
-  }) ?? null;
+  const documents =
+    caseFacts.documentsNeeded?.map((requestedName): DocumentGuidance => {
+      const type = DOCUMENT_NAMES.get(requestedName);
+      const entry = type === undefined ? undefined : catalog.documents.get(type);
+      return {
+        requestedName,
+        documentType: type ?? null,
+        mapping: type === undefined ? "unmapped" : entry ? "mapped" : "unavailable",
+        guidelineKey: entry?.referenceKey ?? null,
+        originalRequirement: requestedName.startsWith("original ") ? "required" : "not_specified",
+        guidance: entry?.guidance ?? null,
+        alternatives: entry?.alternatives ?? catalog.generalAlternatives,
+        alternativesKind: entry?.alternatives ? "document_specific" : "general",
+      };
+    }) ?? null;
   const followupRules = catalog.followupGuidance.map((fact): DataFact<FollowupRule> => {
     const unanchored = fact.value.topic === "submission_timing";
     return {
@@ -101,9 +114,13 @@ export function buildDocumentGuidance(
     };
   });
   return structuredClone({
-    caseId: caseFacts.caseId, documents, general: catalog.general,
+    caseId: caseFacts.caseId,
+    documents,
+    general: catalog.general,
     caseType: catalog.caseTypes.get(caseFacts.caseType) ?? null,
-    processingTimeEstimate: catalog.processingTimeEstimate, humanReview: catalog.humanReview,
-    followupRules, fallback: catalog.fallback,
+    processingTimeEstimate: catalog.processingTimeEstimate,
+    humanReview: catalog.humanReview,
+    followupRules,
+    fallback: catalog.fallback,
   });
 }

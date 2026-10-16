@@ -1,0 +1,17 @@
+**
+!Dockerfile
+!package.json
+!bun.lock
+!tsconfig.json
+!playwright.config.ts
+!.prettierrc.json
+!src/
+!src/**
+!scripts/
+!scripts/**
+!tests/
+!tests/**
+!fixtures/
+!fixtures/**
+!evals/
+!evals/**

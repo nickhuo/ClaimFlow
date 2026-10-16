@@ -20,7 +20,9 @@ export async function runPiSmoke(cwd = process.cwd()) {
     name: "record_facts",
     label: "Record caller facts",
     description: "Record this smoke's empty caller facts; returns no protected data.",
-    authorize: () => { authorizations += 1; },
+    authorize: () => {
+      authorizations += 1;
+    },
     async execute(input) {
       assert.equal(input.turnId, "smoke");
       toolExecutions += 1;
@@ -32,11 +34,14 @@ export async function runPiSmoke(cwd = process.cwd()) {
     provider: provider.provider,
     modelId: "offline",
     apiKey: "offline-smoke-placeholder",
-    systemPrompt: "You are an offline agent harness smoke. Record empty facts, then confirm completion.",
+    systemPrompt:
+      "You are an offline agent harness smoke. Record empty facts, then confirm completion.",
     tools: [tool],
   });
   const events: string[] = [];
-  const unsubscribe = session.subscribe((event) => { events.push(event.type); });
+  const unsubscribe = session.subscribe((event) => {
+    events.push(event.type);
+  });
   try {
     assert.deepEqual(session.getActiveToolNames(), ["record_facts"]);
     await session.prompt("Record the smoke turn.", { expandPromptTemplates: false });
@@ -44,10 +49,20 @@ export async function runPiSmoke(cwd = process.cwd()) {
     assert.equal(authorizations, 1);
     assert.equal(toolExecutions, 1);
     assert.equal(provider.state.callCount, 2);
-    for (const event of ["agent_start", "tool_execution_start", "tool_execution_end", "agent_settled"]) {
+    for (const event of [
+      "agent_start",
+      "tool_execution_start",
+      "tool_execution_end",
+      "agent_settled",
+    ]) {
       assert.ok(events.includes(event), `Missing SDK event: ${event}`);
     }
-    return { sdkVersion: VERSION, providerCalls: provider.state.callCount, toolExecutions, events: [...new Set(events)] };
+    return {
+      sdkVersion: VERSION,
+      providerCalls: provider.state.callCount,
+      toolExecutions,
+      events: [...new Set(events)],
+    };
   } finally {
     unsubscribe();
     await session.abort();
@@ -56,5 +71,5 @@ export async function runPiSmoke(cwd = process.cwd()) {
 }
 
 if (import.meta.main) {
-  console.log(JSON.stringify({ status: "passed", ...await runPiSmoke() }, null, 2));
+  console.log(JSON.stringify({ status: "passed", ...(await runPiSmoke()) }, null, 2));
 }

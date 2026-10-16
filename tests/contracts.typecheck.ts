@@ -19,32 +19,57 @@ export type EveryBusinessToolHasTypedInputAndOutput = Assert<
 >;
 export type ToolInputsDoNotSupplyTrustedContext = Assert<
   {
-    [Name in BusinessToolName]: Extract<keyof BusinessToolContracts[Name]["input"], "state" | "sessionId" | "stateVersion">
+    [Name in BusinessToolName]: Extract<
+      keyof BusinessToolContracts[Name]["input"],
+      "state" | "sessionId" | "stateVersion"
+    >;
   }[BusinessToolName] extends never
-    ? true : false
+    ? true
+    : false
 >;
 
 // Canonical runtime schemas must keep the existing domain contract in both directions.
-type SameShape<Left, Right> = [Left] extends [Right] ? [Right] extends [Left] ? true : false : false;
-export type CallerFactsContract = Assert<SameShape<BusinessToolContracts["record_facts"]["input"]["facts"], CallerFacts>>;
-export type CaseFactsContract = Assert<SameShape<BusinessToolContracts["read_case"]["output"], ToolFact<CaseFacts>>>;
-export type IdentityContract = Assert<SameShape<BusinessToolContracts["verify_identity"]["output"], IdentityAssessment>>;
-export type AuthorizationContract = Assert<SameShape<BusinessToolContracts["request_authorization"]["output"], RepresentativeAuthorization>>;
-export type EmailConsentContract = Assert<SameShape<BusinessToolContracts["set_email_consent"]["output"], EmailConsent>>;
+type SameShape<Left, Right> = [Left] extends [Right]
+  ? [Right] extends [Left]
+    ? true
+    : false
+  : false;
+export type CallerFactsContract = Assert<
+  SameShape<BusinessToolContracts["record_facts"]["input"]["facts"], CallerFacts>
+>;
+export type CaseFactsContract = Assert<
+  SameShape<BusinessToolContracts["read_case"]["output"], ToolFact<CaseFacts>>
+>;
+export type IdentityContract = Assert<
+  SameShape<BusinessToolContracts["verify_identity"]["output"], IdentityAssessment>
+>;
+export type AuthorizationContract = Assert<
+  SameShape<BusinessToolContracts["request_authorization"]["output"], RepresentativeAuthorization>
+>;
+export type EmailConsentContract = Assert<
+  SameShape<BusinessToolContracts["set_email_consent"]["output"], EmailConsent>
+>;
 
 // These are never executed. An unused @ts-expect-error fails the typecheck if drift returns.
 export function rejectWrongInput() {
   defineBusinessTool({
-    name: "read_case", label: "Invalid", description: "Mismatched input",
+    name: "read_case",
+    label: "Invalid",
+    description: "Mismatched input",
     // @ts-expect-error read_case requires caseId; callbacks cannot widen the name to another tool.
     authorize: (_input: { unrelated: number }) => {},
-    async execute() { throw new Error("Not executed"); },
+    async execute() {
+      throw new Error("Not executed");
+    },
   });
 }
 
 export function rejectWrongOutput() {
   defineBusinessTool({
-    name: "read_case", label: "Invalid", description: "Mismatched output", authorize: () => {},
+    name: "read_case",
+    label: "Invalid",
+    description: "Mismatched output",
+    authorize: () => {},
     // @ts-expect-error read_case must return a sourced case fact, not arbitrary details.
     execute: async () => ({ unrelated: true }),
   });
@@ -52,8 +77,13 @@ export function rejectWrongOutput() {
 
 export function rejectSchemaOverride() {
   defineBusinessTool({
-    name: "record_facts", label: "Invalid", description: "Schema override", authorize: () => {},
-    async execute() { return { recorded: true }; },
+    name: "record_facts",
+    label: "Invalid",
+    description: "Schema override",
+    authorize: () => {},
+    async execute() {
+      return { recorded: true };
+    },
     // @ts-expect-error input schemas come from the name's canonical business contract.
     parameters: { type: "object", properties: {} },
   });

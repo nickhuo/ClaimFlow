@@ -14,7 +14,8 @@ export function readSopPolicy(env: Readonly<Record<string, string | undefined>>)
     const raw = env[name];
     if (raw === undefined) continue;
     const value = Number(raw);
-    if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(value)) throw new Error(`${name} must be a positive safe integer`);
+    if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(value))
+      throw new Error(`${name} must be a positive safe integer`);
     policy[key] = value;
   }
   return Object.freeze(policy);

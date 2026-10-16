@@ -2,7 +2,8 @@ import type { RepresentativeRelationship } from "../domain/authorization.ts";
 import type { AmountDefinition, AmountField, CaseFacts } from "../domain/claims.ts";
 import type { CaseDocumentGuidance } from "../domain/documents.ts";
 import type { DataFact } from "../domain/facts.ts";
-import type { Policyholder } from "../domain/identity.ts";
+import type { IdentityField, Policyholder } from "../domain/identity.ts";
+import type { RepresentativeAuthorization } from "../domain/authorization.ts";
 
 export interface Clock {
   now(): number;
@@ -18,10 +19,27 @@ export interface ConsentScenario {
 export interface BusinessData {
   getPolicyholder(subjectId: string): Promise<DataFact<Policyholder> | null>;
   findPolicyholderByPolicyNumber(policyNumber: string): Promise<DataFact<Policyholder> | null>;
+  findPolicyholderByIdentity(
+    identity: Partial<Readonly<Record<IdentityField, string>>>,
+  ): Promise<DataFact<Policyholder> | null>;
   getRepresentatives(subjectId: string): Promise<readonly DataFact<RepresentativeRelationship>[]>;
   getConsentScenario(name: string): Promise<DataFact<ConsentScenario> | null>;
   listCases(subjectId: string): Promise<readonly DataFact<CaseFacts>[]>;
   getCase(subjectId: string, caseId: string): Promise<DataFact<CaseFacts> | null>;
-  getDocumentGuidance(subjectId: string, caseId: string): Promise<DataFact<CaseDocumentGuidance> | null>;
+  getDocumentGuidance(
+    subjectId: string,
+    caseId: string,
+  ): Promise<DataFact<CaseDocumentGuidance> | null>;
   getAmountDefinition(field: AmountField): Promise<DataFact<AmountDefinition>>;
+}
+
+export interface AuthorizationProvider {
+  check(request: {
+    readonly sessionId: string;
+    readonly representativeId: string;
+    readonly subjectId: string;
+    readonly requestedAt: number;
+    readonly now: number;
+    readonly timeoutMs: number;
+  }): Promise<RepresentativeAuthorization>;
 }

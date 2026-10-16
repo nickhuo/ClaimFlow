@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { AMOUNT_FIELDS } from "../../domain/claims.ts";
 import { assertTimestamp } from "../../domain/calendar.ts";
 import type { DataFact } from "../../domain/facts.ts";
-import type { Policyholder } from "../../domain/identity.ts";
+import { matchIdentity, type Policyholder } from "../../domain/identity.ts";
 import type { RepresentativeRelationship } from "../../domain/authorization.ts";
 import type { BusinessData, Clock } from "../../application/ports.ts";
 import { documentGuidance } from "./documents.ts";
@@ -43,8 +43,8 @@ export function createFixtureData(input: FixtureInput, options: FixtureOptions =
     assertTimestamp(timestamp);
     return timestamp;
   };
-  const holderFact = (entry: ReturnType<typeof holders.get>) => entry
-    ? fact("policyholders.json", `/${entry.index}`, policyholder(entry.record), now()) : null;
+  const holderFact = (entry: ReturnType<typeof holders.get>) =>
+    entry ? fact("policyholders.json", `/${entry.index}`, policyholder(entry.record), now()) : null;
   const ownedCase = (subjectId: string, caseId: string) => {
     const entry = cases.get(caseId);
     return entry?.record.belongsTo(subjectId) ? entry : undefined;
@@ -57,29 +57,65 @@ export function createFixtureData(input: FixtureInput, options: FixtureOptions =
     async findPolicyholderByPolicyNumber(policyNumber) {
       return holderFact(policies.get(policyNumber));
     },
+    async findPolicyholderByIdentity(identity) {
+      const field = identity.fullName
+        ? "fullName"
+        : identity.email
+          ? "email"
+          : identity.phone
+            ? "phone"
+            : null;
+      if (!field) return null;
+      const matches = [...holders.values()].filter(
+        (entry) =>
+          matchIdentity({ [field]: identity[field] }, policyholder(entry.record))[0]?.outcome ===
+          "match",
+      );
+      return matches.length === 1 ? holderFact(matches[0]) : null;
+    },
     async getRepresentatives(subjectId) {
       const observedAt = now();
-      return records["representatives.json"].flatMap((record, index): DataFact<RepresentativeRelationship>[] => {
-        if (record.buyer_party_id !== subjectId) return [];
-        return [fact("representatives.json", `/${index}`, {
-          subjectId: record.buyer_party_id,
-          fullName: record.rep_name,
-          relationship: record.relationship,
-          policyholderName: record.buyer_name,
-        }, observedAt)];
-      });
+      return records["representatives.json"].flatMap(
+        (record, index): DataFact<RepresentativeRelationship>[] => {
+          if (record.buyer_party_id !== subjectId) return [];
+          return [
+            fact(
+              "representatives.json",
+              `/${index}`,
+              {
+                subjectId: record.buyer_party_id,
+                fullName: record.rep_name,
+                relationship: record.relationship,
+                policyholderName: record.buyer_name,
+              },
+              observedAt,
+            ),
+          ];
+        },
+      );
     },
     async getConsentScenario(name) {
       const scenarios = records["consent_scenarios.json"];
       const scenario = Object.hasOwn(scenarios, name) ? scenarios[name] : undefined;
-      return scenario ? fact("consent_scenarios.json", `/${pointerKey(name)}`, {
-        simulation: "mock" as const, statusSequence: scenario.status_sequence,
-      }, now()) : null;
+      return scenario
+        ? fact(
+            "consent_scenarios.json",
+            `/${pointerKey(name)}`,
+            {
+              simulation: "mock" as const,
+              statusSequence: scenario.status_sequence,
+            },
+            now(),
+          )
+        : null;
     },
     async listCases(subjectId) {
       const observedAt = now();
-      return [...cases.values()].filter(({ record }) => record.belongsTo(subjectId))
-        .map(({ record, index }) => fact("claims.json", `/${index}`, record.factsAt(observedAt), observedAt));
+      return [...cases.values()]
+        .filter(({ record }) => record.belongsTo(subjectId))
+        .map(({ record, index }) =>
+          fact("claims.json", `/${index}`, record.factsAt(observedAt), observedAt),
+        );
     },
     async getCase(subjectId, caseId) {
       const entry = ownedCase(subjectId, caseId);
@@ -91,14 +127,28 @@ export function createFixtureData(input: FixtureInput, options: FixtureOptions =
       const entry = ownedCase(subjectId, caseId);
       if (!entry) return null;
       const observedAt = now();
-      return documentGuidance(records["required_document_guideline.json"], entry.record.factsAt(observedAt), entry.index, observedAt);
+      return documentGuidance(
+        records["required_document_guideline.json"],
+        entry.record.factsAt(observedAt),
+        entry.index,
+        observedAt,
+      );
     },
     async getAmountDefinition(field) {
-      if (!(AMOUNT_FIELDS as readonly string[]).includes(field)) throw new Error("Unknown amount field");
+      if (!(AMOUNT_FIELDS as readonly string[]).includes(field))
+        throw new Error("Unknown amount field");
       const definition = records["claim_schema.json"].field_descriptions[field];
-      return fact("claim_schema.json", `/field_descriptions/${field}`, {
-        field, currency: "USD" as const, example: definition.example, description: definition.description,
-      }, now());
+      return fact(
+        "claim_schema.json",
+        `/field_descriptions/${field}`,
+        {
+          field,
+          currency: "USD" as const,
+          example: definition.example,
+          description: definition.description,
+        },
+        now(),
+      );
     },
   };
 }
@@ -107,20 +157,22 @@ export async function loadFixtureData(
   options: FixtureOptions & { readonly directory?: string } = {},
 ): Promise<BusinessData> {
   const directory = options.directory ?? DEFAULT_DIRECTORY;
-  const entries = await Promise.all((Object.keys(FIXTURE_SCHEMAS) as FixtureFile[]).map(async (file) => {
-    let text: string;
-    try {
-      text = await Bun.file(join(directory, file)).text();
-    } catch {
-      throw new FixtureDataError(file, "", "read_failed");
-    }
-    let value: unknown;
-    try {
-      value = JSON.parse(text);
-    } catch {
-      throw new FixtureDataError(file, "", "invalid_json");
-    }
-    return [file, value] as const;
-  }));
+  const entries = await Promise.all(
+    (Object.keys(FIXTURE_SCHEMAS) as FixtureFile[]).map(async (file) => {
+      let text: string;
+      try {
+        text = await Bun.file(join(directory, file)).text();
+      } catch {
+        throw new FixtureDataError(file, "", "read_failed");
+      }
+      let value: unknown;
+      try {
+        value = JSON.parse(text);
+      } catch {
+        throw new FixtureDataError(file, "", "invalid_json");
+      }
+      return [file, value] as const;
+    }),
+  );
   return createFixtureData(Object.fromEntries(entries) as FixtureInput, options);
 }
