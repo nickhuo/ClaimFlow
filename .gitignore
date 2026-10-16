@@ -12,6 +12,10 @@ coverage/
 .env.*
 !.env.example
 
+# Local agent setup
+/AGENTS.md
+/docs/agents/
+
 # Runtime data and generated evaluation artifacts
 .data/
 artifacts/
