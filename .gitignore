@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data and generated evaluation artifacts
+.data/
+artifacts/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Browser test output
+playwright-report/
+test-results/
+
+# Logs
+*.log
