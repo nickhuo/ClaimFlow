@@ -11,6 +11,9 @@ test("a naturally written birthday verifies without replacing the remembered cla
       text: "My name is Margaret Chen, policy POL-9921. Why was my January healthcare claim denied?",
     });
     expect(partial.view.verified).toBe(false);
+    expect(partial.view.phase).toBe("VERIFY_ID");
+    expect(partial.reply).not.toContain("pathology");
+    expect(partial.reply).not.toContain("CL-2048");
     const answer = await service.turn(access, {
       requestId: "two",
       text: "My date of birth is March 15, 1985, and my SSN last four is 4472.",
@@ -74,28 +77,6 @@ test("brief single-turn example crosses verified gates through real Pi, answers 
     const skipped = await service.turn(access, { requestId: "three", text: "Skip email" });
     expect(skipped.view.status).toBe("completed");
     expect(await service.outbox(access)).toHaveLength(0);
-  } finally {
-    await service.close();
-  }
-});
-
-test("partial verification retains early intent, blocks disclosure, and resolves once enough fields match", async () => {
-  const { service } = await setup();
-  try {
-    const access = await service.create();
-    const partial = await service.turn(access, {
-      requestId: "one",
-      text: "My name is Margaret Chen, policy POL-9921. My healthcare claim from January was denied.",
-    });
-    expect(partial.view.phase).toBe("VERIFY_ID");
-    expect(partial.reply).not.toContain("pathology");
-    expect(partial.reply).not.toContain("CL-2048");
-    const verified = await service.turn(access, {
-      requestId: "two",
-      text: "DOB is 1985-03-15, SSN last four is 4472.",
-    });
-    expect(verified.view.phase).toBe("PROCESS_CASE");
-    expect(verified.reply).toContain("CL-2048");
   } finally {
     await service.close();
   }

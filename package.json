@@ -12,7 +12,6 @@
     "dev:demo": "AGENT_MODE=demo bun --watch src/server.ts",
     "start": "bun src/server.ts",
     "build": "bun scripts/build-ui.ts",
-    "smoke": "bun scripts/pi-smoke.ts",
     "test": "bun test",
     "test:postgres": "bun scripts/test-postgres.ts",
     "typecheck": "tsc --noEmit",

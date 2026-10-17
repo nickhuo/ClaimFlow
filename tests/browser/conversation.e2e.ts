@@ -12,12 +12,11 @@ async function showProgress(page: Page, open: boolean) {
 
 test("React conversation completes four phases, recovers email failure and resets with accessible dialogs", async ({
   page,
-}, info) => {
+}) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "A clear next step." })).toBeVisible();
-  await page.screenshot({ path: `artifacts/ui-${info.project.name}-welcome.png`, fullPage: true });
   await page.getByRole("button", { name: "Try a sample conversation" }).click();
   await expect(page.getByRole("textbox", { name: "Your message" })).toBeFocused();
   await page.getByRole("textbox", { name: "Your message" }).press("Enter");
@@ -49,10 +48,6 @@ test("React conversation completes four phases, recovers email failure and reset
     .fill("What is the reimbursement amount?");
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByRole("log")).toContainText("USD 0.00");
-  await page.screenshot({
-    path: `artifacts/ui-${info.project.name}-conversation.png`,
-    fullPage: true,
-  });
   await page.getByRole("button", { name: "New conversation" }).click();
   await expect(page.getByRole("button", { name: "Keep this conversation" })).toBeFocused();
   await page.getByRole("button", { name: "Start new", exact: true }).click();
