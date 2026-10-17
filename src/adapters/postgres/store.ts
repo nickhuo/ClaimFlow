@@ -43,8 +43,11 @@ const delivery = (row: DeliveryRow): DeliveryRecord => ({
 /** Shared authority survives Vercel cold starts; SQL transactions guard competing instances. */
 export class PostgresSessionStore implements SessionStore {
   readonly #sql: SQL;
+  readonly #locks: SQL;
   private constructor(url: string) {
     this.#sql = new SQL(url, { max: 10, idleTimeout: 20, connectionTimeout: 15 });
+    // Long-running turn locks must not occupy every connection needed for business writes.
+    this.#locks = new SQL(url, { max: 10, idleTimeout: 20, connectionTimeout: 15 });
   }
 
   static async open(url: string): Promise<PostgresSessionStore> {
@@ -135,7 +138,7 @@ export class PostgresSessionStore implements SessionStore {
   }
 
   async withSessionLock<T>(access: SessionAccess, work: () => Promise<T>): Promise<T> {
-    return this.#sql.begin(async (sql) => {
+    return this.#locks.begin(async (sql) => {
       // A transaction lock also works behind Neon's transaction-mode pooler.
       const [row] = await sql<
         { acquired: boolean }[]
@@ -252,7 +255,7 @@ export class PostgresSessionStore implements SessionStore {
     return rows.length > 0;
   }
 
-  close() {
-    return this.#sql.close();
+  async close() {
+    await Promise.all([this.#locks.close(), this.#sql.close()]);
   }
 }

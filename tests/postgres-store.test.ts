@@ -40,6 +40,40 @@ integration(
 );
 
 integration(
+  "Postgres turn locks leave connections available for concurrent business writes",
+  async () => {
+    const store = await open();
+    const now = Date.now();
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let count = 0;
+    let work: Promise<unknown>[] = [];
+    try {
+      const sessions = await Promise.all(
+        Array.from({ length: 10 }, () => store.create(initialConversation(), now, 600_000)),
+      );
+      work = sessions.map(({ access, record }) =>
+        store.withSessionLock(access, async () => {
+          if (++count === sessions.length) entered.resolve();
+          await release.promise;
+          return store.save(access, 0, record.state, now, 600_000);
+        }),
+      );
+      await entered.promise;
+      release.resolve();
+      const saved = await Promise.all(work);
+      expect(saved).toHaveLength(10);
+      for (const { access } of sessions) expect((await store.read(access, now)).version).toBe(1);
+    } finally {
+      release.resolve();
+      await Promise.allSettled(work);
+      await store.close();
+    }
+  },
+  45_000,
+);
+
+integration(
   "Postgres serializes turns across instances and persists replay and cancellation",
   async () => {
     const first = await open();
