@@ -2,7 +2,7 @@
 
 An insurance claims support agent with a four-stage workflow: identity verification → intent resolution → claim processing → follow-up.
 
-[Live demo](https://claimflow-henna.vercel.app) — real model responses, sample records, and a mock email outbox.
+[Live demo](https://tryclaimflow.vercel.app) — real model responses, sample records, and a mock email outbox.
 
 ## Setup
 
