@@ -5,6 +5,7 @@ import { mockAuthorization } from "../src/adapters/authorization/mock.ts";
 import { mockEmail } from "../src/adapters/email/mock.ts";
 import { demoProvider } from "../src/adapters/pi/demo-provider.ts";
 import { modelConfiguration } from "../src/adapters/pi/provider.ts";
+import { CUSTOMER_REPLY_PROMPT, piReplyComposer } from "../src/adapters/pi/reply-composer.ts";
 import { piHarnessFactory, type PiObservation } from "../src/adapters/pi/harness.ts";
 import { ConversationService } from "../src/application/sessions.ts";
 import { DEFAULT_SOP_POLICY, type Phase } from "../src/domain/conversation.ts";
@@ -30,7 +31,7 @@ async function versions() {
     sdk: packageJson.dependencies["@earendil-works/pi-coding-agent"],
     bun: Bun.version,
     fixtures: hash(contents.join("\n")),
-    prompt: hash(SYSTEM_PROMPT),
+    prompt: hash(`${SYSTEM_PROMPT}\n${CUSTOMER_REPLY_PROMPT}`),
     tools: hash(JSON.stringify(BUSINESS_TOOL_SCHEMAS)),
     policy: hash(JSON.stringify(DEFAULT_SOP_POLICY)),
     scenarios: hash(JSON.stringify(scenarios)),
@@ -65,6 +66,9 @@ export async function evaluate(
   const data = await loadFixtureData({ clock });
   const trajectory: PiObservation[] = [];
   const observations: BusinessObservation[] = [];
+  const trace = (event: PiObservation) => {
+    if (trajectory.length < 2000) trajectory.push(event);
+  };
   const service = new ConversationService(
     {
       data,
@@ -73,6 +77,7 @@ export async function evaluate(
       email: mockEmail(),
       authorization: mockAuthorization(data),
       policy: DEFAULT_SOP_POLICY,
+      ...(configured ? { replyComposer: piReplyComposer(configured, trace) } : {}),
       observe: (event) => {
         if (observations.length < 1000) observations.push(event);
       },
@@ -80,9 +85,7 @@ export async function evaluate(
     piHarnessFactory({
       cwd: process.cwd(),
       provider: configured ? () => configured : demoProvider,
-      trace: (event) => {
-        if (trajectory.length < 2000) trajectory.push(event);
-      },
+      trace,
     }),
   );
   const results: unknown[] = [];

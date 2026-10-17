@@ -8,6 +8,7 @@ import { mockEmail } from "./adapters/email/mock.ts";
 import { webhookEmail } from "./adapters/email/webhook.ts";
 import { demoProvider } from "./adapters/pi/demo-provider.ts";
 import { modelConfiguration } from "./adapters/pi/provider.ts";
+import { piReplyComposer } from "./adapters/pi/reply-composer.ts";
 import { piHarnessFactory } from "./adapters/pi/harness.ts";
 import { createHttpHandler } from "./adapters/http/handler.ts";
 import { ConversationService } from "./application/sessions.ts";
@@ -56,7 +57,15 @@ export async function startServer(env: Readonly<Record<string, string | undefine
   const store = new SqliteSessionStore(database);
   await chmod(database, 0o600);
   const service = new ConversationService(
-    { data, store, clock, policy, email, authorization: mockAuthorization(data, scenario) },
+    {
+      data,
+      store,
+      clock,
+      policy,
+      email,
+      authorization: mockAuthorization(data, scenario),
+      ...(configured ? { replyComposer: piReplyComposer(configured) } : {}),
+    },
     piHarnessFactory({ cwd: root, provider: configured ? () => configured : demoProvider }),
   );
   try {

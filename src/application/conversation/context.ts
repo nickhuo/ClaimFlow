@@ -8,6 +8,7 @@ import {
 import type { AuthorizationProvider, BusinessData, Clock } from "../ports.ts";
 import type {
   EmailSender,
+  ReplyComposer,
   SessionAccess,
   SessionRecord,
   SessionStore,
@@ -24,6 +25,7 @@ export interface BusinessDependencies {
   readonly email: EmailSender;
   readonly clock: Clock;
   readonly policy: SopPolicy;
+  readonly replyComposer?: ReplyComposer;
   readonly observe?: (event: BusinessObservation) => void;
 }
 

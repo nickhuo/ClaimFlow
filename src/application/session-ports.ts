@@ -54,6 +54,7 @@ export type PublicEvent =
         | "locating"
         | "reading"
         | "preparing"
+        | "replying"
         | "sending"
         | "handoff";
     }
@@ -124,4 +125,13 @@ export interface ConversationHarness {
 }
 export interface HarnessFactory {
   create(): Promise<ConversationHarness>;
+}
+
+/** A tool-free wording step, isolated from the agent transcript and identity records. */
+export interface CustomerReply {
+  readonly question: string;
+  readonly approvedResponse: string;
+}
+export interface ReplyComposer {
+  compose(input: CustomerReply, signal: AbortSignal): Promise<string>;
 }

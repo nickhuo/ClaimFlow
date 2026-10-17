@@ -75,6 +75,7 @@ const activities = {
   locating: "Finding your claim",
   reading: "Looking into your claim",
   preparing: "Preparing your summary",
+  replying: "Writing your answer",
   sending: "Checking your email request",
   handoff: "Recording your request",
 };
@@ -310,7 +311,7 @@ function Conversation({ initial, config }: { initial: Session; config: Configura
           <Flex align="center" gap="4" className="topbar-actions">
             <span className="mode-label">
               <span />
-              {config.mode === "demo" ? "Interactive demo" : "Live model"}
+              {config.mode === "demo" ? "Scripted demo" : "Live model"}
             </span>
             <AlertDialog.Root open={resetOpen} onOpenChange={setResetOpen}>
               <AlertDialog.Trigger>
@@ -389,7 +390,7 @@ function Conversation({ initial, config }: { initial: Session; config: Configura
                       A question, a claim, a next step. We’ll work through it together, starting
                       with a few details to verify it’s you.
                     </p>
-                    {config.mode === "demo" && initial.view.version === 0 && (
+                    {initial.view.version === 0 && (
                       <Button
                         className="sample-button"
                         variant="surface"

@@ -10,6 +10,7 @@ import type {
 import { BusinessContext, type BusinessDependencies } from "./conversation/context.ts";
 import { BusinessOperations } from "./conversation/tools.ts";
 import { renderReply, sessionView } from "./conversation/reply.ts";
+import { acceptsCustomerReply, customerReplyInput } from "./conversation/customer-reply.ts";
 import { maskEmail } from "./follow-up.ts";
 
 interface ActiveRun {
@@ -141,6 +142,7 @@ export class ConversationService {
       emit(event);
     };
     let error: TurnResult["error"] = null;
+    let customerReply: string | undefined;
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
@@ -192,7 +194,40 @@ export class ConversationService {
             }),
         });
       }
-      context.read();
+      const record = context.read();
+      if (this.dependencies.replyComposer) {
+        const approvedResponse = renderReply(
+          record.state,
+          this.dependencies.clock.now(),
+          this.dependencies.policy,
+          context.clarification,
+        );
+        publish({
+          type: "progress",
+          requestId: input.requestId,
+          phase: record.state.phase,
+          activity: "replying",
+        });
+        const reply = await this.dependencies.replyComposer.compose(
+          customerReplyInput(input.text, approvedResponse, record.state),
+          active.controller.signal,
+        );
+        const current = context.read();
+        // Late model text cannot survive cancellation, reset, or a changed permission projection.
+        this.#read(access);
+        if (
+          current.version !== record.version ||
+          renderReply(
+            current.state,
+            this.dependencies.clock.now(),
+            this.dependencies.policy,
+            context.clarification,
+          ) !== approvedResponse ||
+          !acceptsCustomerReply(reply, approvedResponse, current.state)
+        )
+          throw new Error("customer_reply_rejected");
+        customerReply = reply;
+      }
     } catch (cause) {
       error =
         timedOut || (cause instanceof Error && cause.message === "run_limit")
@@ -207,12 +242,14 @@ export class ConversationService {
     try {
       // Read directly after cancellation; business writes and late events remain blocked by the run signal.
       const record = this.#read(access);
-      let reply = renderReply(
-        record.state,
-        this.dependencies.clock.now(),
-        this.dependencies.policy,
-        context.clarification,
-      );
+      let reply =
+        customerReply ??
+        renderReply(
+          record.state,
+          this.dependencies.clock.now(),
+          this.dependencies.policy,
+          context.clarification,
+        );
       if (error)
         reply +=
           error === "cancelled"
