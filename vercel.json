@@ -8,7 +8,7 @@
   "regions": ["iad1"],
   "functions": {
     "src/server.ts": {
-      "includeFiles": "{fixtures,dist}/**",
+      "includeFiles": "{fixtures,dist,node_modules/lru-cache}/**",
       "maxDuration": 120
     }
   }
