@@ -87,19 +87,14 @@ Captured in live mode using the supplied sample records and mock email. These ex
 
 ![Conversation summary with save and skip choices](docs/screenshots/03-summary-consent.png)
 
-<details>
-<summary>Completed delivery, scope limits, and emotional support</summary>
-
-**Demo outbox.** After explicit consent, the summary appears in the outbox with a masked recipient and a clear notice that no real email was sent.
+**4. Demo outbox.** After explicit consent, the summary appears in the outbox with a masked recipient and a clear notice that no real email was sent.
 
 ![Summary recorded in the mock outbox](docs/screenshots/04-demo-outbox.png)
 
-**Scope limits.** Repeated “What is RL?” questions receive insurance-only redirection, followed by a simulated human-assistance request.
+**5. Scope limits.** Repeated “What is RL?” questions receive insurance-only redirection, followed by a simulated human-assistance request.
 
 ![Repeated off-topic questions lead to a simulated handoff](docs/screenshots/06-scope-and-handoff.png)
 
-**Emotional support (bonus).** A frustrated caller receives empathy and verification options while claim details remain protected.
+**6. Emotional support (bonus).** A frustrated caller receives empathy and verification options while claim details remain protected.
 
 ![Empathetic response without bypassing identity verification](docs/screenshots/05-empathy-and-verification.png)
-
-</details>
