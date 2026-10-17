@@ -8,7 +8,8 @@
   "regions": ["iad1"],
   "functions": {
     "src/server.ts": {
-      "includeFiles": "{fixtures,dist,node_modules/lru-cache}/**",
+      "includeFiles": "{fixtures,dist,node_modules}/**",
+      "excludeFiles": "node_modules/{typescript,@typescript,prettier,playwright,playwright-core,@playwright,@types,bun-types}/**",
       "maxDuration": 120
     }
   }
