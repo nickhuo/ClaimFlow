@@ -95,7 +95,7 @@ export async function evaluate(
       for (const scenario of selected) {
         trajectory.length = 0;
         observations.length = 0;
-        const access = service.create();
+        const access = await service.create();
         const steps: unknown[] = [];
         for (const [index, step] of scenario.steps.entries()) {
           const observationStart = observations.length;
@@ -159,8 +159,8 @@ export async function evaluate(
             sdkTrajectory: metrics,
           });
         }
-        const record = service.dependencies.store.read(access, clock.now());
-        const deliveries = service.dependencies.store.deliveries(access, clock.now());
+        const record = await service.dependencies.store.read(access, clock.now());
+        const deliveries = await service.dependencies.store.deliveries(access, clock.now());
         const checks = [
           { id: "delivery-count", passed: deliveries.length === scenario.deliveries },
           {

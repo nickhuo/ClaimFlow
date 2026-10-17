@@ -3,6 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadFixtureData } from "./adapters/fixtures/index.ts";
 import { SqliteSessionStore } from "./adapters/sqlite/store.ts";
+import { PostgresSessionStore } from "./adapters/postgres/store.ts";
+import type { SessionStore } from "./application/session-ports.ts";
 import { mockAuthorization } from "./adapters/authorization/mock.ts";
 import { mockEmail } from "./adapters/email/mock.ts";
 import { webhookEmail } from "./adapters/email/webhook.ts";
@@ -52,10 +54,16 @@ export async function startServer(env: Readonly<Record<string, string | undefine
       type: type!,
     });
   }
-  const database = resolve(root, env.SESSION_DB_PATH ?? ".data/sessions.sqlite");
-  await mkdir(dirname(database), { recursive: true, mode: 0o700 });
-  const store = new SqliteSessionStore(database);
-  await chmod(database, 0o600);
+  let store: SessionStore;
+  if (env.DATABASE_URL) {
+    store = await PostgresSessionStore.open(env.DATABASE_URL);
+  } else {
+    if (env.VERCEL === "1") throw new Error("Configure DATABASE_URL for shared Vercel sessions.");
+    const database = resolve(root, env.SESSION_DB_PATH ?? ".data/sessions.sqlite");
+    await mkdir(dirname(database), { recursive: true, mode: 0o700 });
+    store = new SqliteSessionStore(database);
+    await chmod(database, 0o600);
+  }
   const service = new ConversationService(
     {
       data,
@@ -102,7 +110,7 @@ export async function startServer(env: Readonly<Record<string, string | undefine
   }
 }
 
-if (import.meta.main) {
+if (import.meta.main || process.env.VERCEL === "1") {
   try {
     const app = await startServer();
     console.log(

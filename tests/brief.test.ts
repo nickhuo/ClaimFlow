@@ -5,7 +5,7 @@ import { DEFAULT_SOP_POLICY } from "../src/domain/conversation.ts";
 test("a naturally written birthday verifies without replacing the remembered claim month", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     const partial = await service.turn(access, {
       requestId: "one",
       text: "My name is Margaret Chen, policy POL-9921. Why was my January healthcare claim denied?",
@@ -30,7 +30,7 @@ test.each(["03/04/1985", "February 30, 1985"])(
   async (dateOfBirth) => {
     const { service } = await setup();
     try {
-      const access = service.create();
+      const access = await service.create();
       const first = await service.turn(access, {
         requestId: "one",
         text: `My name is Margaret Chen, policy POL-9921, DOB is ${dateOfBirth}, SSN last four 4472. Why was my January healthcare claim denied?`,
@@ -56,7 +56,7 @@ test.each(["03/04/1985", "February 30, 1985"])(
 test("brief single-turn example crosses verified gates through real Pi, answers from facts, then skips email", async () => {
   const { service, traces } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     const first = await service.turn(access, { requestId: "one", text: sample });
     expect(first.error).toBeNull();
     expect(first.view.phase).toBe("PROCESS_CASE");
@@ -73,7 +73,7 @@ test("brief single-turn example crosses verified gates through real Pi, answers 
     expect(summary.view.summary?.text).not.toContain("1985-03-15");
     const skipped = await service.turn(access, { requestId: "three", text: "Skip email" });
     expect(skipped.view.status).toBe("completed");
-    expect(service.outbox(access)).toHaveLength(0);
+    expect(await service.outbox(access)).toHaveLength(0);
   } finally {
     await service.close();
   }
@@ -82,7 +82,7 @@ test("brief single-turn example crosses verified gates through real Pi, answers 
 test("partial verification retains early intent, blocks disclosure, and resolves once enough fields match", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     const partial = await service.turn(access, {
       requestId: "one",
       text: "My name is Margaret Chen, policy POL-9921. My healthcare claim from January was denied.",
@@ -104,7 +104,7 @@ test("partial verification retains early intent, blocks disclosure, and resolves
 test("foreign claim hints do not reveal existence and switching an owned claim discards old facts", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     await service.turn(access, { requestId: "one", text: sample });
     const switched = await service.turn(access, {
       requestId: "two",
@@ -127,7 +127,7 @@ test("foreign claim hints do not reveal existence and switching an owned claim d
 test("email failure stays failed until a new explicit retry; duplicates create one logical delivery", async () => {
   const { service } = await setup(1);
   try {
-    const access = service.create();
+    const access = await service.create();
     await service.turn(access, { requestId: "one", text: sample });
     await service.turn(access, { requestId: "two", text: "That's all" });
     const failed = await service.turn(access, { requestId: "three", text: "Send the summary" });
@@ -140,8 +140,8 @@ test("email failure stays failed until a new explicit retry; duplicates create o
     const retried = await service.turn(access, { requestId: "four", text: "Retry email" });
     expect(retried.view.delivery?.status).toBe("mock_recorded");
     expect(retried.view.status).toBe("completed");
-    expect(service.outbox(access)).toHaveLength(1);
-    expect(service.outbox(access)[0]?.recipient).toBe("m•••@email.com");
+    expect(await service.outbox(access)).toHaveLength(1);
+    expect((await service.outbox(access))[0]?.recipient).toBe("m•••@email.com");
     await expect(
       service.turn(access, { requestId: "three", text: "Send the summary" }),
     ).rejects.toThrow("stale_request");
@@ -153,7 +153,7 @@ test("email failure stays failed until a new explicit retry; duplicates create o
 test("a follow-up resumes case processing and requires consent for a new summary version", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     await service.turn(access, { requestId: "one", text: sample });
     const firstSummary = await service.turn(access, { requestId: "two", text: "That's all" });
     const answer = await service.turn(access, {
@@ -171,7 +171,7 @@ test("a follow-up resumes case processing and requires consent for a new summary
       action: { type: "send", summaryVersion: 1 },
     });
     expect(stale.view.status).toBe("active");
-    expect(service.outbox(access)).toHaveLength(0);
+    expect(await service.outbox(access)).toHaveLength(0);
   } finally {
     await service.close();
   }
@@ -180,8 +180,8 @@ test("a follow-up resumes case processing and requires consent for a new summary
 test("independent sessions can run concurrently; same-session duplicates serialize without repeated verification", async () => {
   const { service, advance } = await setup();
   try {
-    const a = service.create();
-    const b = service.create();
+    const a = await service.create();
+    const b = await service.create();
     const input = { requestId: "same", text: sample };
     const [one, duplicate, other] = await Promise.all([
       service.turn(a, input),
@@ -199,7 +199,7 @@ test("independent sessions can run concurrently; same-session duplicates seriali
       "session_expired",
     );
     advance(DEFAULT_SOP_POLICY.sessionIdleTimeoutMs);
-    expect(() => service.view(b)).toThrow("session_expired");
+    await expect(service.view(b)).rejects.toThrow("session_expired");
   } finally {
     await service.close();
   }
@@ -208,7 +208,7 @@ test("independent sessions can run concurrently; same-session duplicates seriali
 test("out-of-scope repetition requests a simulated human handoff without granting authority", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     for (const requestId of ["1", "2"]) {
       const reply = await service.turn(access, { requestId, text: "What is RL?" });
       expect(reply.view.status).toBe("active");
@@ -226,7 +226,7 @@ test("out-of-scope repetition requests a simulated human handoff without grantin
 test("BR-01: refusal offers alternate fields; name, phone and email can verify without DOB or SSN", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     const refusal = await service.turn(access, {
       requestId: "one",
       text: "I don't want to share my SSN. Why do you need my identity?",
@@ -249,7 +249,7 @@ test("BR-01: refusal offers alternate fields; name, phone and email can verify w
 test("BR-02: ambiguous authorized cases ask for a distinction and reuse the caller's later answer", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     const ambiguous = await service.turn(access, {
       requestId: "one",
       text: "My name is Margaret Chen, policy POL-9921, DOB 1985-03-15, SSN last four 4472. What is the status of my healthcare claim?",
@@ -263,7 +263,8 @@ test("BR-02: ambiguous authorized cases ask for a distinction and reuse the call
     expect(selected.view.phase).toBe("PROCESS_CASE");
     expect(selected.reply).toContain("CL-2048");
     expect(
-      service.dependencies.store.read(access, service.dependencies.clock.now()).state.identityAudit,
+      (await service.dependencies.store.read(access, service.dependencies.clock.now())).state
+        .identityAudit,
     ).toHaveLength(1);
   } finally {
     await service.close();
@@ -273,7 +274,7 @@ test("BR-02: ambiguous authorized cases ask for a distinction and reuse the call
 test("BR-03: grounded document alternatives, amounts and next steps carry into the optional email summary", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     await service.turn(access, { requestId: "one", text: sample });
     const documents = await service.turn(access, {
       requestId: "two",
@@ -296,10 +297,10 @@ test("BR-03: grounded document alternatives, amounts and next steps carry into t
     expect(summary.view.summary?.text).toContain("USD 0.00");
     expect(summary.view.summary?.text).toContain("Next steps:");
     expect(summary.view.summary?.text).toContain("Document guidance:");
-    expect(service.outbox(access)).toHaveLength(0);
+    expect(await service.outbox(access)).toHaveLength(0);
     const sent = await service.turn(access, { requestId: "six", text: "Please send the summary" });
     expect(sent.view.status).toBe("completed");
-    expect(service.outbox(access)[0]?.body).toBe(summary.view.summary!.text);
+    expect((await service.outbox(access))[0]?.body).toBe(summary.view.summary!.text);
     expect(sent.reply).toContain("No real email was sent");
   } finally {
     await service.close();
@@ -309,7 +310,7 @@ test("BR-03: grounded document alternatives, amounts and next steps carry into t
 test("BR-04: mixed scope answers only the insurance part and resets repeated off-topic escalation", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     await service.turn(access, { requestId: "one", text: "What is RL?" });
     await service.turn(access, { requestId: "two", text: "What is RL?" });
     const mixed = await service.turn(access, {
@@ -340,7 +341,7 @@ test.each([
   async (_name, text, empathy) => {
     const { service } = await setup();
     try {
-      const answer = await service.turn(service.create(), { requestId: "one", text });
+      const answer = await service.turn(await service.create(), { requestId: "one", text });
       expect(answer.reply).toContain(empathy);
       expect(answer.reply).toContain("three different identity details");
       expect(answer.reply).toContain("email address");
@@ -355,7 +356,7 @@ test.each([
 test("BR-06: repeated identity refusal stops persuasion and offers simulated human assistance", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     for (const requestId of ["one", "two"])
       expect(
         (await service.turn(access, { requestId, text: "I refuse to share any identity details" }))

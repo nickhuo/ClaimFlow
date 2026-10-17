@@ -24,7 +24,7 @@ export async function setup(
     {
       data,
       clock,
-      store: new SqliteSessionStore(),
+      store: overrides.store ?? new SqliteSessionStore(),
       email: mockEmail(failures),
       authorization: mockAuthorization(data),
       policy: DEFAULT_SOP_POLICY,

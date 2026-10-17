@@ -29,3 +29,6 @@ test-results/
 
 # Logs
 *.log
+
+# Vercel local project metadata
+.vercel/

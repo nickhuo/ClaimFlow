@@ -3,11 +3,11 @@ import type { BusinessContext } from "./conversation/context.ts";
 import { buildSummary } from "./conversation/reply.ts";
 import { confirmsCompletion, emailDecision, suppliedRecipient } from "./conversation/user-turn.ts";
 
-export function completeCase(context: BusinessContext) {
-  context.commit({
+export async function completeCase(context: BusinessContext) {
+  await context.commit({
     type: "finish",
     confirmed: confirmsCompletion(context.input),
-    summary: buildSummary(context.read().state),
+    summary: buildSummary((await context.read()).state),
   });
   return { phase: "POST_PROCESS" as const };
 }
@@ -16,7 +16,7 @@ export async function setEmailConsent(
   decision: "send" | "skip",
   summaryVersion: number,
 ) {
-  const state = context.read().state;
+  const state = (await context.read()).state;
   if (emailDecision(context.input) !== decision)
     throw new RuleViolation("explicit_email_choice_required");
   if (
@@ -30,7 +30,7 @@ export async function setEmailConsent(
     const holder = await context.dependencies.data.getPolicyholder(state.identity.subjectId);
     recipient = holder?.value.email ?? null;
   }
-  const next = context.commit({
+  const next = await context.commit({
     type: "email_choice",
     decision,
     confirmed: true,
@@ -49,8 +49,8 @@ export function maskEmail(recipient: string): string {
   return `${local?.slice(0, 1) ?? ""}•••@${domain ?? ""}`;
 }
 export async function sendSummary(context: BusinessContext, summaryVersion: number) {
-  const current = context.read();
-  context.subject();
+  const current = await context.read();
+  await context.subject();
   if (
     current.state.emailConsent.status !== "granted" ||
     current.state.emailConsent.summaryVersion !== summaryVersion ||
@@ -66,14 +66,14 @@ export async function sendSummary(context: BusinessContext, summaryVersion: numb
   )
     throw new RuleViolation("explicit_email_choice_required");
   context.deliveryAttempted = true;
-  const { record, attempt } = context.dependencies.store.reserveDelivery(
+  const { record, attempt } = await context.dependencies.store.reserveDelivery(
     context.access,
     current.version,
     context.dependencies.clock.now(),
   );
   let status = record.status;
   if (attempt) {
-    context.commit({
+    await context.commit({
       type: "delivery_updated",
       summaryVersion,
       delivery: { deliveryId: record.id, status: "pending" },
@@ -84,16 +84,16 @@ export async function sendSummary(context: BusinessContext, summaryVersion: numb
       status = "unknown";
     }
     // Receipt reconciliation survives cancellation; a cancelled request never implies that nothing was sent.
-    context.dependencies.store.updateDelivery(record.id, status);
+    await context.dependencies.store.updateDelivery(record.id, status);
   } else if (status === "unknown" || status === "pending") {
     try {
       status = await context.dependencies.email.reconcile(record);
     } catch {
       status = "unknown";
     }
-    context.dependencies.store.updateDelivery(record.id, status);
+    await context.dependencies.store.updateDelivery(record.id, status);
   }
-  context.commit({
+  await context.commit({
     type: "delivery_updated",
     summaryVersion,
     delivery: { deliveryId: record.id, status },

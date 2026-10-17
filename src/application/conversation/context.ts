@@ -44,27 +44,27 @@ export class BusinessContext {
     readonly access: SessionAccess,
     readonly input: TurnInput,
     readonly signal: AbortSignal,
-    readonly assertCurrent: () => void,
+    readonly assertCurrent: () => void | Promise<void>,
   ) {}
-  read(): SessionRecord {
-    this.assertCurrent();
+  async read(): Promise<SessionRecord> {
+    await this.assertCurrent();
     this.signal.throwIfAborted();
     return this.dependencies.store.read(this.access, this.dependencies.clock.now());
   }
-  subject(): string {
+  async subject(): Promise<string> {
     return authorizedSubject(
-      this.read().state,
+      (await this.read()).state,
       this.dependencies.clock.now(),
       this.dependencies.policy,
     );
   }
-  commit(event: ConversationEvent): SessionRecord {
-    const current = this.read();
+  async commit(event: ConversationEvent): Promise<SessionRecord> {
+    const current = await this.read();
     const now = this.dependencies.clock.now();
     const state = transition(current.state, event, now, this.dependencies.policy);
     if (state.phase !== current.state.phase && ++this.#transitions > 8)
       throw new Error("run_limit");
-    const saved = this.dependencies.store.save(
+    const saved = await this.dependencies.store.save(
       this.access,
       current.version,
       state,
@@ -92,8 +92,8 @@ export class BusinessContext {
     });
     return saved;
   }
-  projection(): string {
-    const { state, version } = this.read();
+  async projection(): Promise<string> {
+    const { state, version } = await this.read();
     const facts = collectedFacts(state);
     let subject: string | null = null;
     try {
@@ -106,7 +106,7 @@ export class BusinessContext {
       phase: state.phase,
       status: state.status,
       operationsThisTurn: this.operations,
-      availableTools: this.availableTools(),
+      availableTools: await this.availableTools(),
       identity: state.identity.status,
       recordedThisTurn: state.callerFacts.some((item) => item.turnId === this.input.requestId),
       verifiedThisTurn: state.identityAudit.some((item) => item.turnId === this.input.requestId),
@@ -139,8 +139,8 @@ export class BusinessContext {
     });
   }
 
-  availableTools(): BusinessToolName[] {
-    const { state } = this.read();
+  async availableTools(): Promise<BusinessToolName[]> {
+    const { state } = await this.read();
     const completed = new Set(
       this.operations.filter((item) => item.outcome === "success").map((item) => item.tool),
     );

@@ -3,8 +3,8 @@ import { matchingCases } from "../domain/claims.ts";
 import type { BusinessContext } from "./conversation/context.ts";
 
 export async function resolveCase(context: BusinessContext) {
-  const subjectId = context.subject();
-  const facts = collectedFacts(context.read().state);
+  const subjectId = await context.subject();
+  const facts = collectedFacts((await context.read()).state);
   const clarify = (question: string) => {
     context.clarification = question;
     return { status: "needs_clarification" as const, question };
@@ -14,7 +14,7 @@ export async function resolveCase(context: BusinessContext) {
       "What would you like help with: a claim status, a denial, or the requested documents?",
     );
   const candidates = await context.dependencies.data.listCases(subjectId);
-  context.subject();
+  await context.subject();
   const matches = matchingCases(
     candidates.map((entry) => entry.value),
     {
@@ -44,6 +44,6 @@ export async function resolveCase(context: BusinessContext) {
     sources: selected.sources,
     value: { subjectId, caseId: selected.value.caseId },
   };
-  context.commit({ type: "case_selected", fact });
+  await context.commit({ type: "case_selected", fact });
   return { status: "selected" as const, case: fact };
 }

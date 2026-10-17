@@ -20,7 +20,7 @@ test("the customer composer receives authorized facts without identity values an
     },
   });
   try {
-    const access = service.create();
+    const access = await service.create();
     const input = { requestId: "natural-answer", text: sample };
     const answer = await service.turn(access, input);
     expect(answer.error).toBeNull();
@@ -46,7 +46,7 @@ test("unverified and out-of-scope turns expose only their approved response to t
     },
   });
   try {
-    const access = service.create();
+    const access = await service.create();
     await service.turn(access, { requestId: "unverified", text: "Why was my claim denied?" });
     await service.turn(access, { requestId: "unrelated", text: "What is RL?" });
     expect(inputs[0]!.approvedResponse).toContain("three different identity details");
@@ -77,7 +77,7 @@ for (const unsafe of [
       },
     });
     try {
-      const access = service.create();
+      const access = await service.create();
       const answer = await service.turn(access, { requestId: "unsafe", text: sample });
       expect(answer.error).toBe("model_unavailable");
       expect(answer.reply).not.toContain(unsafe);
@@ -102,7 +102,7 @@ test("cancelling a response during composition drops late text and retains confi
     },
   });
   try {
-    const access = service.create();
+    const access = await service.create();
     const answer = service.turn(access, { requestId: "cancel", text: sample });
     await started.promise;
     await service.cancel(access, "cancel");
@@ -131,7 +131,7 @@ test("reset during composition prevents any old-session reply from being publish
     },
   });
   try {
-    const access = service.create();
+    const access = await service.create();
     const answer = service
       .turn(access, { requestId: "reset", text: sample }, (event) => events.push(event))
       .catch((error: Error) => error);
@@ -140,7 +140,7 @@ test("reset during composition prevents any old-session reply from being publish
     release.resolve();
     expect(await answer).toBeInstanceOf(Error);
     expect(events.some((event) => event.type === "result")).toBe(false);
-    expect(service.view(fresh).verified).toBe(false);
+    expect((await service.view(fresh)).verified).toBe(false);
   } finally {
     release.resolve();
     await service.close();

@@ -72,32 +72,37 @@ export interface DeliveryRecord {
   readonly createdAt: number;
 }
 
-/** SQLite implements atomic CAS and a durable idempotency ledger. No model transcript is stored here. */
+export type Awaitable<T> = T | Promise<T>;
+
+/** Stores enforce atomic versions and durable idempotency. No model transcript is stored here. */
 export interface SessionStore {
   create(
     state: ConversationState,
     now: number,
     ttl: number,
-  ): { access: SessionAccess; record: SessionRecord };
-  read(access: SessionAccess, now: number): SessionRecord;
+  ): Awaitable<{ access: SessionAccess; record: SessionRecord }>;
+  read(access: SessionAccess, now: number): Awaitable<SessionRecord>;
   save(
     access: SessionAccess,
     expectedVersion: number,
     state: ConversationState,
     now: number,
     ttl: number,
-  ): SessionRecord;
-  revoke(access: SessionAccess, now: number): void;
-  beginRequest(access: SessionAccess, input: TurnInput, now: number): TurnResult | null;
-  finishRequest(access: SessionAccess, result: TurnResult, now: number): void;
+  ): Awaitable<SessionRecord>;
+  revoke(access: SessionAccess, now: number): Awaitable<void>;
+  beginRequest(access: SessionAccess, input: TurnInput, now: number): Awaitable<TurnResult | null>;
+  finishRequest(access: SessionAccess, result: TurnResult, now: number): Awaitable<void>;
   reserveDelivery(
     access: SessionAccess,
     expectedVersion: number,
     now: number,
-  ): { record: DeliveryRecord; attempt: boolean };
-  updateDelivery(id: string, status: DeliveryRecord["status"]): DeliveryRecord;
-  deliveries(access: SessionAccess, now: number): readonly DeliveryRecord[];
-  close(): void;
+  ): Awaitable<{ record: DeliveryRecord; attempt: boolean }>;
+  updateDelivery(id: string, status: DeliveryRecord["status"]): Awaitable<DeliveryRecord>;
+  deliveries(access: SessionAccess, now: number): Awaitable<readonly DeliveryRecord[]>;
+  withSessionLock?<T>(access: SessionAccess, work: () => Promise<T>): Promise<T>;
+  cancelRequest?(access: SessionAccess, requestId: string, now: number): Promise<void>;
+  isRequestCancelled?(access: SessionAccess, requestId: string): Promise<boolean>;
+  close(): Awaitable<void>;
 }
 
 export interface EmailSender {
@@ -114,10 +119,12 @@ export interface EmailSender {
 export interface HarnessRun {
   readonly input: TurnInput;
   readonly signal: AbortSignal;
-  readonly context: () => string;
-  readonly authorize: (name: string, input: unknown) => void;
+  readonly context: () => Promise<string>;
+  readonly authorize: (name: string, input: unknown) => Promise<void>;
   readonly execute: (name: string, input: unknown) => Promise<unknown>;
-  readonly onProgress: (activity: Extract<PublicEvent, { type: "progress" }>["activity"]) => void;
+  readonly onProgress: (
+    activity: Extract<PublicEvent, { type: "progress" }>["activity"],
+  ) => Promise<void>;
 }
 export interface ConversationHarness {
   run(run: HarnessRun): Promise<void>;

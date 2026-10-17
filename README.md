@@ -58,6 +58,17 @@ Open **http://127.0.0.1:3000**. Add `-e AGENT_MODE=demo` to the run command for 
 
 </details>
 
+<details>
+<summary>Deploy to Vercel</summary>
+
+Import this repository into Vercel. The included `vercel.json` configures Bun and runs the checks before deployment.
+
+Connect a Neon PostgreSQL database from **Storage** and enable its `DATABASE_URL` for Production and Preview. Add `AGENT_MODE=live`, `MODEL_PROVIDER`, `MODEL_ID`, and a sensitive `MODEL_API_KEY` using the same values as your local setup. Keep `EMAIL_MODE=mock` for the take-home demo, then deploy.
+
+Local setup uses SQLite when `DATABASE_URL` is unset. Vercel uses PostgreSQL to share conversations across function instances and cold starts. To run the database integration tests locally, set `TEST_DATABASE_URL` to a dedicated test database and run `bun run test:postgres`.
+
+</details>
+
 ## Screenshots
 
 Captured in live mode using the supplied sample records and mock email. These examples follow the [brief](docs/brief.md); model wording may vary.

@@ -31,9 +31,9 @@ export class ConversationService {
     readonly runTimeoutMs = 60_000,
   ) {}
 
-  create() {
+  async create() {
     if (this.#closed) throw new RuleViolation("service_unavailable");
-    const { access, record } = this.dependencies.store.create(
+    const { access, record } = await this.dependencies.store.create(
       initialConversation(),
       this.dependencies.clock.now(),
       this.dependencies.policy.sessionIdleTimeoutMs,
@@ -43,10 +43,10 @@ export class ConversationService {
       view: sessionView(record, this.dependencies.clock.now(), this.dependencies.policy),
     };
   }
-  #read(access: SessionAccess) {
+  async #read(access: SessionAccess) {
     let record;
     try {
-      record = this.dependencies.store.read(access, this.dependencies.clock.now());
+      record = await this.dependencies.store.read(access, this.dependencies.clock.now());
     } catch (error) {
       if (error instanceof RuleViolation && error.code === "session_expired") {
         this.#active.get(access.sessionId)?.controller.abort();
@@ -59,24 +59,27 @@ export class ConversationService {
       this.dependencies.clock.now() >=
         record.state.identity.verifiedAt + this.dependencies.policy.sessionIdleTimeoutMs
     ) {
-      this.dependencies.store.revoke(access, this.dependencies.clock.now());
+      await this.dependencies.store.revoke(access, this.dependencies.clock.now());
       this.#active.get(access.sessionId)?.controller.abort();
       void this.#release(access.sessionId);
       throw new RuleViolation("session_expired");
     }
     return record;
   }
-  view(access: SessionAccess) {
-    return sessionView(this.#read(access), this.dependencies.clock.now(), this.dependencies.policy);
-  }
-  outbox(access: SessionAccess) {
-    const subjectId = authorizedSubject(
-      this.#read(access).state,
+  async view(access: SessionAccess) {
+    return sessionView(
+      await this.#read(access),
       this.dependencies.clock.now(),
       this.dependencies.policy,
     );
-    return this.dependencies.store
-      .deliveries(access, this.dependencies.clock.now())
+  }
+  async outbox(access: SessionAccess) {
+    const subjectId = authorizedSubject(
+      (await this.#read(access)).state,
+      this.dependencies.clock.now(),
+      this.dependencies.policy,
+    );
+    return (await this.dependencies.store.deliveries(access, this.dependencies.clock.now()))
       .filter((item) => item.subjectId === subjectId)
       .map((item) => ({
         id: item.id,
@@ -92,10 +95,15 @@ export class ConversationService {
     input: TurnInput,
     emit: (event: PublicEvent) => void = () => {},
   ): Promise<TurnResult> {
-    this.#read(access);
+    await this.#read(access);
     if (this.#closed) throw new RuleViolation("service_unavailable");
     const previous = this.#queues.get(access.sessionId) ?? Promise.resolve();
-    const work = previous.catch(() => {}).then(() => this.#run(access, input, emit));
+    const work = previous
+      .catch(() => {})
+      .then(() => {
+        const run = () => this.#run(access, input, emit);
+        return this.dependencies.store.withSessionLock?.(access, run) ?? run();
+      });
     const tail = work.then(
       () => {},
       () => {},
@@ -112,14 +120,14 @@ export class ConversationService {
     input: TurnInput,
     emit: (event: PublicEvent) => void,
   ): Promise<TurnResult> {
-    this.#read(access);
-    const replay = this.dependencies.store.beginRequest(
+    await this.#read(access);
+    const replay = await this.dependencies.store.beginRequest(
       access,
       input,
       this.dependencies.clock.now(),
     );
     if (replay) {
-      if (this.#read(access).version !== replay.view.version)
+      if ((await this.#read(access)).version !== replay.view.version)
         throw new RuleViolation("stale_request");
       emit({ type: "result", requestId: input.requestId, result: replay });
       return replay;
@@ -131,14 +139,18 @@ export class ConversationService {
       access,
       input,
       active.controller.signal,
-      () => {
+      async () => {
         if (this.#active.get(access.sessionId) !== active || this.#closed)
           throw new RuleViolation("cancelled");
+        if (await this.dependencies.store.isRequestCancelled?.(access, input.requestId)) {
+          active.controller.abort();
+          throw new RuleViolation("cancelled");
+        }
       },
     );
     const operations = new BusinessOperations(context);
-    const publish = (event: PublicEvent) => {
-      context.read();
+    const publish = async (event: PublicEvent) => {
+      await context.read();
       emit(event);
     };
     let error: TurnResult["error"] = null;
@@ -148,8 +160,27 @@ export class ConversationService {
       timedOut = true;
       active.controller.abort();
     }, this.runTimeoutMs);
+    let polling = false;
+    const cancellationPoll = this.dependencies.store.isRequestCancelled
+      ? setInterval(() => {
+          if (polling) return;
+          polling = true;
+          void (async () => {
+            try {
+              await this.#read(access);
+              if (await this.dependencies.store.isRequestCancelled?.(access, input.requestId))
+                active.controller.abort();
+            } catch {
+              active.controller.abort();
+            } finally {
+              polling = false;
+            }
+          })();
+        }, 1000)
+      : null;
+    cancellationPoll?.unref();
     try {
-      publish({ type: "waiting", requestId: input.requestId });
+      await publish({ type: "waiting", requestId: input.requestId });
       if (input.action?.type === "handoff")
         await operations.execute("handoff", { reason: "caller_request" });
       else if (input.action?.type === "finish")
@@ -171,7 +202,7 @@ export class ConversationService {
         if (!harness) {
           harness = await this.harnessFactory.create();
           try {
-            context.read();
+            await context.read();
           } catch (cause) {
             await harness.close();
             throw cause;
@@ -185,16 +216,16 @@ export class ConversationService {
           context: () => context.projection(),
           authorize: (name, args) => operations.authorize(name, args),
           execute: (name, args) => operations.execute(name, args),
-          onProgress: (activity) =>
+          onProgress: async (activity) =>
             publish({
               type: "progress",
               requestId: input.requestId,
-              phase: context.read().state.phase,
+              phase: (await context.read()).state.phase,
               activity,
             }),
         });
       }
-      const record = context.read();
+      const record = await context.read();
       if (this.dependencies.replyComposer) {
         const approvedResponse = renderReply(
           record.state,
@@ -202,7 +233,7 @@ export class ConversationService {
           this.dependencies.policy,
           context.clarification,
         );
-        publish({
+        await publish({
           type: "progress",
           requestId: input.requestId,
           phase: record.state.phase,
@@ -212,9 +243,9 @@ export class ConversationService {
           customerReplyInput(input.text, approvedResponse, record.state),
           active.controller.signal,
         );
-        const current = context.read();
+        const current = await context.read();
         // Late model text cannot survive cancellation, reset, or a changed permission projection.
-        this.#read(access);
+        await this.#read(access);
         if (
           current.version !== record.version ||
           renderReply(
@@ -238,10 +269,11 @@ export class ConversationService {
       await this.#release(access.sessionId);
     } finally {
       clearTimeout(timeout);
+      if (cancellationPoll) clearInterval(cancellationPoll);
     }
     try {
       // Read directly after cancellation; business writes and late events remain blocked by the run signal.
-      const record = this.#read(access);
+      const record = await this.#read(access);
       let reply =
         customerReply ??
         renderReply(
@@ -261,7 +293,7 @@ export class ConversationService {
         reply,
         error,
       };
-      this.dependencies.store.finishRequest(access, result, this.dependencies.clock.now());
+      await this.dependencies.store.finishRequest(access, result, this.dependencies.clock.now());
       emit({ type: "result", requestId: input.requestId, result });
       return result;
     } finally {
@@ -269,7 +301,8 @@ export class ConversationService {
     }
   }
   async cancel(access: SessionAccess, requestId: string): Promise<void> {
-    this.#read(access);
+    await this.#read(access);
+    await this.dependencies.store.cancelRequest?.(access, requestId, this.dependencies.clock.now());
     const active = this.#active.get(access.sessionId);
     if (active?.input.requestId === requestId) {
       active.controller.abort();
@@ -277,8 +310,8 @@ export class ConversationService {
     }
   }
   async reset(access: SessionAccess) {
-    this.#read(access);
-    this.dependencies.store.revoke(access, this.dependencies.clock.now());
+    await this.#read(access);
+    await this.dependencies.store.revoke(access, this.dependencies.clock.now());
     this.#active.get(access.sessionId)?.controller.abort();
     await this.#release(access.sessionId);
     return this.create();
@@ -292,7 +325,7 @@ export class ConversationService {
   async reapExpired(): Promise<void> {
     for (const [id, access] of this.#accesses) {
       try {
-        this.#read(access);
+        await this.#read(access);
       } catch {
         this.#active.get(id)?.controller.abort();
         await this.#release(id);
@@ -304,6 +337,6 @@ export class ConversationService {
     for (const run of this.#active.values()) run.controller.abort();
     await Promise.all([...this.#harnesses.keys()].map((id) => this.#release(id)));
     await Promise.allSettled([...this.#queues.values()]);
-    this.dependencies.store.close();
+    await this.dependencies.store.close();
   }
 }

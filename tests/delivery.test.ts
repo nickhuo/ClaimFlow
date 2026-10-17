@@ -20,7 +20,7 @@ test("unknown send receipts reconcile without resending, even when the user repe
     },
   });
   try {
-    const access = service.create();
+    const access = await service.create();
     await service.turn(access, { requestId: "one", text: sample });
     await service.turn(access, { requestId: "two", text: "That's all" });
     const uncertain = await service.turn(access, {
@@ -52,7 +52,7 @@ test("unknown send receipts reconcile without resending, even when the user repe
     expect(confirmed.view.delivery?.status).toBe("submitted");
     expect(sends).toBe(1);
     expect(checks).toBe(1);
-    expect(service.outbox(access)).toHaveLength(1);
+    expect(await service.outbox(access)).toHaveLength(1);
   } finally {
     await service.close();
   }
@@ -73,7 +73,7 @@ test("checking a failed delivery cannot reuse old consent to send again", async 
     },
   });
   try {
-    const access = service.create();
+    const access = await service.create();
     await service.turn(access, { requestId: "one", text: sample });
     await service.turn(access, { requestId: "two", text: "That's all" });
     await service.turn(access, {
@@ -96,7 +96,7 @@ test("checking a failed delivery cannot reuse old consent to send again", async 
     });
     expect(retried.view.delivery?.status).toBe("submitted");
     expect(sends).toBe(2);
-    expect(service.outbox(access)).toHaveLength(1);
+    expect(await service.outbox(access)).toHaveLength(1);
   } finally {
     await service.close();
   }
@@ -121,7 +121,7 @@ test("cancellation during external delivery preserves its receipt and prevents d
     },
   });
   try {
-    const access = service.create();
+    const access = await service.create();
     await service.turn(access, { requestId: "one", text: sample });
     await service.turn(access, { requestId: "two", text: "That's all" });
     const running = service.turn(access, {
@@ -134,7 +134,7 @@ test("cancellation during external delivery preserves its receipt and prevents d
     released.resolve();
     const cancelled = await running;
     expect(cancelled.error).toBe("cancelled");
-    expect(service.outbox(access)[0]?.status).toBe("submitted");
+    expect((await service.outbox(access))[0]?.status).toBe("submitted");
     const checked = await service.turn(access, {
       requestId: "check",
       text: "Check delivery",

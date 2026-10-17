@@ -3,14 +3,14 @@ import { assessIdentityEvidence, IDENTITY_FIELDS, matchIdentity } from "../domai
 import type { BusinessContext } from "./conversation/context.ts";
 
 export async function verifyIdentity(context: BusinessContext) {
-  const facts = collectedFacts(context.read().state);
+  const facts = collectedFacts((await context.read()).state);
   const supplied = facts.identity ?? {};
   const holder = facts.policyNumber
     ? await context.dependencies.data.findPolicyholderByPolicyNumber(
         facts.policyNumber.trim().toUpperCase(),
       )
     : await context.dependencies.data.findPolicyholderByIdentity(supplied);
-  context.read();
+  await context.read();
   const evidence = holder
     ? matchIdentity(supplied, holder.value)
     : IDENTITY_FIELDS.filter((field) => supplied[field]).map((field) => ({
@@ -20,7 +20,7 @@ export async function verifyIdentity(context: BusinessContext) {
         outcome: "mismatch" as const,
       }));
   if (!evidence.length) return { status: "insufficient" as const, matchedFields: [] };
-  const next = context.commit({
+  const next = await context.commit({
     type: "identity_checked",
     turnId: context.input.requestId,
     evidence,
@@ -29,7 +29,7 @@ export async function verifyIdentity(context: BusinessContext) {
     ],
   });
   if (facts.role === "representative" && !holder)
-    context.commit({ type: "handoff", reason: "authorization_missing" });
+    await context.commit({ type: "handoff", reason: "authorization_missing" });
   return assessIdentityEvidence(next.state.evidence);
 }
 

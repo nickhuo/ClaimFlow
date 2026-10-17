@@ -2,12 +2,13 @@ import { collectedFacts, RuleViolation } from "../domain/conversation.ts";
 import type { BusinessContext } from "./conversation/context.ts";
 
 export async function documentGuidance(context: BusinessContext, caseId: string) {
-  const subjectId = context.subject();
-  const { state } = context.read();
+  const subjectId = await context.subject();
+  const { state } = await context.read();
   if (state.selectedCase?.value.caseId !== caseId || !state.caseFacts)
     throw new RuleViolation("case_unavailable");
   const record = await context.dependencies.data.getDocumentGuidance(subjectId, caseId);
-  if (context.subject() !== subjectId || !record) throw new RuleViolation("case_unavailable");
+  if ((await context.subject()) !== subjectId || !record)
+    throw new RuleViolation("case_unavailable");
   const guidance = record.value;
   const topic = collectedFacts(state).topic;
   let text: string;
@@ -45,6 +46,6 @@ export async function documentGuidance(context: BusinessContext, caseId: string)
     toolName: "document_guidance",
     operationId: context.input.requestId,
   };
-  context.commit({ type: "guidance_read", fact });
+  await context.commit({ type: "guidance_read", fact });
   return fact;
 }

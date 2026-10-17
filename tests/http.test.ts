@@ -81,7 +81,7 @@ test("disconnecting SSE does not repeat a business request when reconnecting wit
   const { service } = await setup();
   const handle = createHttpHandler(service, { mode: "demo", email: "mock" });
   try {
-    const access = service.create();
+    const access = await service.create();
     const request = () =>
       new Request(`http://localhost/api/sessions/${access.sessionId}/turns`, {
         method: "POST",
@@ -94,7 +94,8 @@ test("disconnecting SSE does not repeat a business request when reconnecting wit
     const text = await replay.text();
     expect(text).toContain("CL-2048");
     expect(
-      service.dependencies.store.read(access, service.dependencies.clock.now()).state.identityAudit,
+      (await service.dependencies.store.read(access, service.dependencies.clock.now())).state
+        .identityAudit,
     ).toHaveLength(1);
   } finally {
     await service.close();

@@ -6,7 +6,7 @@ import type { BusinessObservation } from "../src/application/telemetry.ts";
 test("evaluation distinguishes task failure, unsafe success and infrastructure failure; refusing everything earns no task reward", async () => {
   const { service } = await setup();
   try {
-    const access = service.create();
+    const access = await service.create();
     const valid = await service.turn(access, { requestId: "one", text: sample });
     const expectation = {
       label: "answer",
@@ -71,7 +71,7 @@ test("business telemetry records authorization and state versions without PII an
     },
   });
   try {
-    const result = await service.turn(service.create(), { requestId: "one", text: sample });
+    const result = await service.turn(await service.create(), { requestId: "one", text: sample });
     expect(result.error).toBeNull();
     expect(result.view.phase).toBe("PROCESS_CASE");
     expect(

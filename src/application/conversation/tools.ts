@@ -19,8 +19,8 @@ import { observe } from "../telemetry.ts";
 export class BusinessOperations {
   #steps = 0;
   constructor(readonly context: BusinessContext) {}
-  authorize(name: string, raw: unknown): void {
-    const { state } = this.context.read();
+  async authorize(name: string, raw: unknown): Promise<void> {
+    const { state } = await this.context.read();
     if (!Object.hasOwn(BUSINESS_TOOL_SCHEMAS, name)) throw new RuleViolation("unknown_tool");
     const key = name as BusinessToolName;
     if (!Check(BUSINESS_TOOL_SCHEMAS[key].input, raw))
@@ -41,17 +41,17 @@ export class BusinessOperations {
         "resume_case",
       ].includes(name)
     )
-      this.context.subject();
+      await this.context.subject();
     if (name === "read_case" || name === "document_guidance") {
       if ((raw as { caseId: string }).caseId !== state.selectedCase?.value.caseId)
         throw new RuleViolation("case_unavailable");
     }
   }
   async execute(name: string, raw: unknown): Promise<unknown> {
-    const { state } = this.context.read();
+    const { state } = await this.context.read();
     let verified = false;
     try {
-      this.context.subject();
+      await this.context.subject();
       verified = true;
     } catch {
       /* Protected operations still enforce the gate below. */
@@ -92,7 +92,7 @@ export class BusinessOperations {
     }
   }
   async #execute(name: string, raw: unknown): Promise<unknown> {
-    this.authorize(name, raw);
+    await this.authorize(name, raw);
     if (++this.#steps > 24) throw new RuleViolation("run_limit");
     const input = <Name extends BusinessToolName>(_name: Name) =>
       raw as BusinessToolContracts[Name]["input"];
@@ -103,7 +103,7 @@ export class BusinessOperations {
         requireOriginatingTurn(context, args.turnId);
         const facts = groundCallerFacts(args.facts, context.input);
         context.clarification = null;
-        context.commit({ type: "record", turnId: args.turnId, facts });
+        await context.commit({ type: "record", turnId: args.turnId, facts });
         return { recorded: true };
       }
       case "verify_identity":
@@ -131,11 +131,11 @@ export class BusinessOperations {
         return sendSummary(context, input("send_summary").summaryVersion);
       case "resume_case":
         requireOriginatingTurn(context, input("resume_case").turnId);
-        context.commit({ type: "resume" });
+        await context.commit({ type: "resume" });
         return { phase: "PROCESS_CASE" };
       case "handoff": {
         const { reason } = input("handoff");
-        const state = context.read().state;
+        const state = (await context.read()).state;
         const supported =
           reason === "caller_request"
             ? requestsHuman(context.input)
@@ -162,7 +162,7 @@ export class BusinessOperations {
                           context.dependencies.policy.maxConsecutiveOffTopic
                         : false;
         if (!supported) throw new RuleViolation("handoff_reason_not_confirmed");
-        context.commit({ type: "handoff", reason });
+        await context.commit({ type: "handoff", reason });
         return { status: "requested" };
       }
     }

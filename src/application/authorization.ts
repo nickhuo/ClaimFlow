@@ -4,11 +4,11 @@ import type { BusinessContext } from "./conversation/context.ts";
 
 export async function requestAuthorization(context: BusinessContext) {
   context.authorizationChecked = true;
-  const { state } = context.read();
+  const { state } = await context.read();
   const facts = collectedFacts(state);
   if (facts.role !== "representative") return { status: "not_required" as const };
   if (state.identity.status !== "verified" || !facts.representedPolicyNumber) {
-    context.commit({ type: "handoff", reason: "authorization_missing" });
+    await context.commit({ type: "handoff", reason: "authorization_missing" });
     return { status: "denied" as const };
   }
   const representativeId = state.identity.subjectId;
@@ -16,11 +16,11 @@ export async function requestAuthorization(context: BusinessContext) {
     context.dependencies.data.getPolicyholder(representativeId),
     context.dependencies.data.findPolicyholderByPolicyNumber(facts.representedPolicyNumber),
   ]);
-  context.read();
+  await context.read();
   const relationships = target
     ? await context.dependencies.data.getRepresentatives(target.value.subjectId)
     : [];
-  context.read();
+  await context.read();
   if (
     !caller ||
     !target ||
@@ -30,7 +30,7 @@ export async function requestAuthorization(context: BusinessContext) {
         normalizeIdentity("fullName", caller.value.fullName),
     )
   ) {
-    context.commit({ type: "handoff", reason: "authorization_missing" });
+    await context.commit({ type: "handoff", reason: "authorization_missing" });
     return { status: "denied" as const };
   }
   const now = context.dependencies.clock.now();
@@ -49,7 +49,7 @@ export async function requestAuthorization(context: BusinessContext) {
           now,
           timeoutMs: context.dependencies.policy.authorizationTimeoutMs,
         });
-  context.read();
+  await context.read();
   if (
     grant.status === "approved" &&
     (grant.subjectId !== target.value.subjectId || grant.representativeId !== representativeId)
@@ -60,6 +60,6 @@ export async function requestAuthorization(context: BusinessContext) {
     requestedAt + context.dependencies.policy.authorizationTimeoutMs
       ? { status: "expired" as const }
       : grant;
-  context.commit({ type: "authorization_checked", authorization: checked });
+  await context.commit({ type: "authorization_checked", authorization: checked });
   return checked;
 }

@@ -28,7 +28,7 @@ async function representative(scenario = "default") {
       id === "TEST-REP" ? caller : fixture.getPolicyholder(id),
   };
   const environment = await setup(0, { data, authorization: mockAuthorization(data, scenario) });
-  const access = environment.service.create();
+  const access = await environment.service.create();
   const operations = (turnId: string, text: string) =>
     new BusinessOperations(
       new BusinessContext(
@@ -70,7 +70,7 @@ test("verified representative stays blocked while pending; scoped mock approval 
     expect(await first.execute("request_authorization", { turnId: "first" })).toMatchObject({
       status: "pending",
     });
-    expect(service.view(access).verified).toBe(false);
+    expect((await service.view(access)).verified).toBe(false);
     const next = operations("second", "Check my authorization");
     expect(await next.execute("request_authorization", { turnId: "second" })).toMatchObject({
       status: "approved",
@@ -101,9 +101,9 @@ test("pending authorization times out without releasing any case data", async ()
         turnId: "second",
       }),
     ).toMatchObject({ status: "expired" });
-    expect(service.view(access).handoff?.reason).toBe("authorization_timeout");
-    expect(service.view(access).verified).toBe(false);
-    expect(() => service.outbox(access)).toThrow();
+    expect((await service.view(access)).handoff?.reason).toBe("authorization_timeout");
+    expect((await service.view(access)).verified).toBe(false);
+    await expect(service.outbox(access)).rejects.toThrow();
   } finally {
     await service.close();
   }

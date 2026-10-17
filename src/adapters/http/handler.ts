@@ -118,7 +118,7 @@ export function createHttpHandler(
         throw new RuleViolation("origin_not_allowed");
       if (url.pathname === "/api/sessions" && request.method === "POST") {
         if (!Check(empty, await body(request))) throw new RuleViolation("invalid_request");
-        return json(service.create(), 201);
+        return json(await service.create(), 201);
       }
       const path = url.pathname.match(
         /^\/api\/sessions\/([a-f0-9-]{36})(?:\/(turns|reset|cancel|outbox))?$/,
@@ -128,10 +128,10 @@ export function createHttpHandler(
         sessionId: path[1]!,
         token: request.headers.get("Authorization")?.match(/^Bearer ([a-f0-9-]{72})$/)?.[1] ?? "",
       };
-      service.view(access);
-      if (!path[2] && request.method === "GET") return json(service.view(access));
+      await service.view(access);
+      if (!path[2] && request.method === "GET") return json(await service.view(access));
       if (path[2] === "outbox" && request.method === "GET")
-        return json({ deliveries: service.outbox(access) });
+        return json({ deliveries: await service.outbox(access) });
       if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
       const input = await body(request);
       if (path[2] === "reset") {

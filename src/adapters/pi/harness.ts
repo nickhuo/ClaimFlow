@@ -85,13 +85,13 @@ export function piHarnessFactory(options: {
           name,
           label: name.replaceAll("_", " "),
           description: `Insurance business operation ${name}. Current SOP guards always apply.`,
-          authorize: (args) => {
-            run().authorize(name, args);
+          authorize: async (args) => {
+            await run().authorize(name, args);
           },
           async execute(args) {
             const active = run();
-            active.authorize(name, args);
-            active.onProgress(activities[name]);
+            await active.authorize(name, args);
+            await active.onProgress(activities[name]);
             const output = await active.execute(name, args);
             run();
             return output as BusinessToolContracts[Name]["output"];
@@ -108,14 +108,14 @@ export function piHarnessFactory(options: {
         tools: businessTools,
         ...(options.retry ? { retry: options.retry } : {}),
         hooks: {
-          authorize: (name, args) => {
+          authorize: async (name, args) => {
             if (++toolCalls > 24) {
               limited = true;
               void session?.abort();
               throw new RuleViolation("run_limit");
             }
             try {
-              run().authorize(name, args);
+              await run().authorize(name, args);
             } catch (error) {
               trace({
                 type: "tool_blocked",
@@ -124,14 +124,14 @@ export function piHarnessFactory(options: {
               throw error;
             }
           },
-          context: () => {
+          context: async () => {
             try {
               const active = run();
               if (++requests > 12) {
                 limited = true;
                 void session?.abort();
               }
-              const projection = active.context();
+              const projection = await active.context();
               trace({
                 type: "model_request",
                 projectionCharacters: projection.length + active.input.text.length,

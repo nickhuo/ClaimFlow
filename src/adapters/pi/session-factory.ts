@@ -28,8 +28,10 @@ export interface SessionOptions {
   readonly thinkingLevel?: ThinkingLevel | "off";
   readonly tools?: readonly BusinessTool[];
   readonly hooks?: {
-    readonly context: (event: ContextEvent) => ContextEvent["messages"];
-    readonly authorize: (name: string, input: unknown) => void;
+    readonly context: (
+      event: ContextEvent,
+    ) => ContextEvent["messages"] | Promise<ContextEvent["messages"]>;
+    readonly authorize: (name: string, input: unknown) => void | Promise<void>;
   };
   readonly retry?: {
     readonly enabled: boolean;
@@ -54,13 +56,13 @@ function createResources(systemPrompt: string, hooks?: SessionOptions["hooks"]):
   };
   if (hooks) {
     extension.handlers.set("context", [
-      async (event) => ({ messages: hooks.context(event as ContextEvent) }),
+      async (event) => ({ messages: await hooks.context(event as ContextEvent) }),
     ]);
     extension.handlers.set("tool_call", [
       async (raw) => {
         const event = raw as ToolCallEvent;
         try {
-          hooks.authorize(event.toolName, event.input);
+          await hooks.authorize(event.toolName, event.input);
         } catch {
           return {
             block: true,

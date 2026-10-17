@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "bun",
+  "bunVersion": "1.x",
+  "installCommand": "bun install --frozen-lockfile",
+  "buildCommand": "bun run check && bun run test:postgres && bun run build",
+  "regions": ["iad1"],
+  "functions": {
+    "src/server.ts": {
+      "includeFiles": "{fixtures,dist}/**",
+      "maxDuration": 120
+    }
+  }
+}
