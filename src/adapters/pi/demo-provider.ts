@@ -5,6 +5,7 @@ import {
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import type { CallerFacts } from "../../domain/conversation.ts";
+import { dateOfBirthMentions } from "../../domain/date-of-birth.ts";
 import type { TurnInput } from "../../application/session-ports.ts";
 import {
   confirmsCompletion,
@@ -127,6 +128,7 @@ export function demoProvider(): ProviderConfiguration {
 
 export function extractDemoFacts(text: string, collectIdentity = true): CallerFacts {
   const identity: Record<string, string> = {};
+  const dob = collectIdentity ? dateOfBirthMentions(text)[0] : undefined;
   const name =
     text.match(
       /(?:my name is|name[: ]+)\s+([A-Za-z]+(?:[ -][A-Za-z]+){1,3})(?=[,.]|\s+(?:policy|and|my|dob)|$)/i,
@@ -136,7 +138,6 @@ export function extractDemoFacts(text: string, collectIdentity = true): CallerFa
     )?.[1];
   if (collectIdentity) {
     if (name && !/policyholder|calling|the|angry/i.test(name)) identity.fullName = name;
-    const dob = text.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
     if (dob) identity.dateOfBirth = dob;
     const ssn = text.match(
       /(?:ssn(?: last (?:four|4))?|last (?:four|4))(?:\s+(?:is|digits|are))?[: ]+(\d{4})\b/i,
@@ -158,7 +159,7 @@ export function extractDemoFacts(text: string, collectIdentity = true): CallerFa
       : /dental/i.test(text)
         ? ("dental" as const)
         : undefined;
-  const month = text.match(
+  const month = (dob ? text.replace(dob, "") : text).match(
     /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i,
   )?.[0];
   const claimedStatus = /denied|denial/i.test(text)

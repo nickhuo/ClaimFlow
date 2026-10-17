@@ -15,6 +15,25 @@ export interface Step {
 }
 export const scenarios: { name: string; steps: Step[]; deliveries: number }[] = [
   {
+    name: "natural-date-clarification",
+    deliveries: 0,
+    steps: [
+      {
+        label: "ambiguous-birth-date",
+        text: "My name is Margaret Chen, policy POL-9921, DOB is 03/04/1985, SSN last four 4472. Why was my January healthcare claim denied?",
+        phase: "VERIFY_ID",
+        verified: false,
+      },
+      {
+        label: "written-birth-date",
+        text: "My date of birth is March 15, 1985.",
+        phase: "PROCESS_CASE",
+        verified: true,
+        includes: ["CL-2048", "pathology report"],
+      },
+    ],
+  },
+  {
     name: "single-turn-and-send",
     deliveries: 1,
     steps: [

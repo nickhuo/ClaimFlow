@@ -39,3 +39,29 @@ test("grounding never concatenates unrelated numbers into a phone or supplies mi
     ),
   ).toThrow();
 });
+
+test("DOB grounding accepts a model-normalized date only when the same unambiguous date was supplied", () => {
+  for (const dateOfBirth of ["March 15, 1985", "1985-03-15"])
+    expect(
+      groundCallerFacts(
+        { identity: { dateOfBirth } },
+        { requestId: "t", text: "I was born on March 15, 1985." },
+      ).identity?.dateOfBirth,
+    ).toBe("March 15, 1985");
+  for (const text of [
+    "My birthday is March 16, 1985.",
+    "March was the month. Policy 15, year 1985.",
+    "DOB is 1985-03-150.",
+    "You already know my birthday.",
+  ])
+    expect(() =>
+      groundCallerFacts({ identity: { dateOfBirth: "1985-03-15" } }, { requestId: "t", text }),
+    ).toThrow("identity_value_not_in_turn");
+  for (const dateOfBirth of ["1985-03-04", "1985-04-03"])
+    expect(() =>
+      groundCallerFacts(
+        { identity: { dateOfBirth } },
+        { requestId: "t", text: "DOB is 03/04/1985." },
+      ),
+    ).toThrow("identity_value_not_in_turn");
+});

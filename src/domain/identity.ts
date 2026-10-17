@@ -1,3 +1,5 @@
+import { normalizeDateOfBirth } from "./date-of-birth.ts";
+
 export const IDENTITY_FIELDS = ["fullName", "dateOfBirth", "phone", "email", "ssnLast4"] as const;
 export type IdentityField = (typeof IDENTITY_FIELDS)[number];
 export const MINIMUM_IDENTITY_MATCHES = 3;
@@ -10,6 +12,7 @@ export function normalizeIdentity(field: IdentityField, value: string): string {
   }
   if (field === "fullName") return text.toLocaleLowerCase("en-US").replace(/\s+/g, " ");
   if (field === "email") return text.toLocaleLowerCase("en-US");
+  if (field === "dateOfBirth") return normalizeDateOfBirth(text) ?? text;
   return text;
 }
 
@@ -33,11 +36,13 @@ export function matchIdentity(
         origin: "identity_verifier" as const,
         subjectId: reference.subjectId,
         field,
-        outcome: expected[field].some(
-          (candidate) => normalizeIdentity(field, candidate) === normalizeIdentity(field, value),
-        )
-          ? ("match" as const)
-          : ("mismatch" as const),
+        outcome:
+          (field !== "dateOfBirth" || normalizeDateOfBirth(value) !== null) &&
+          expected[field].some(
+            (candidate) => normalizeIdentity(field, candidate) === normalizeIdentity(field, value),
+          )
+            ? ("match" as const)
+            : ("mismatch" as const),
       },
     ];
   });

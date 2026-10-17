@@ -1,5 +1,6 @@
 import { RuleViolation, type CallerFacts } from "../../domain/conversation.ts";
 import { normalizeIdentity, type IdentityField } from "../../domain/identity.ts";
+import { dateOfBirthMentions, normalizeDateOfBirth } from "../../domain/date-of-birth.ts";
 import type { TurnInput } from "../session-ports.ts";
 
 const normalized = (value: string) =>
@@ -12,8 +13,22 @@ const plain = (value: string) =>
 /** Model extraction can only retain identity values actually present in this originating turn. */
 export function groundCallerFacts(facts: CallerFacts, input: TurnInput): CallerFacts {
   const text = normalized(input.text);
+  let grounded = facts;
   for (const [key, value] of Object.entries(facts.identity ?? {})) {
     const field = key as IdentityField;
+    if (field === "dateOfBirth") {
+      const date = normalizeDateOfBirth(value);
+      const source =
+        dateOfBirthMentions(input.text).find(
+          (candidate) =>
+            normalized(candidate) === normalized(value) ||
+            (date !== null && normalizeDateOfBirth(candidate) === date),
+        ) ?? (date === null && text.includes(normalized(value)) ? value : undefined);
+      if (!source) throw new RuleViolation("identity_value_not_in_turn");
+      // Keep the actual caller expression for provenance, redaction, and format clarification.
+      grounded = { ...facts, identity: { ...facts.identity, dateOfBirth: source } };
+      continue;
+    }
     const supplied = normalizeIdentity(field, value);
     const present =
       field === "phone"
@@ -40,7 +55,7 @@ export function groundCallerFacts(facts: CallerFacts, input: TurnInput): CallerF
     );
   if (representative && facts.role === "policyholder")
     throw new RuleViolation("caller_role_conflict");
-  return representative ? { ...facts, role: "representative" } : facts;
+  return representative ? { ...grounded, role: "representative" } : grounded;
 }
 
 export function confirmsCompletion(input: TurnInput): boolean {

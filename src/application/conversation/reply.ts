@@ -5,6 +5,7 @@ import {
   type SopPolicy,
 } from "../../domain/conversation.ts";
 import type { SessionRecord, SessionView } from "../session-ports.ts";
+import { normalizeDateOfBirth } from "../../domain/date-of-birth.ts";
 
 const fieldLabels: Record<string, string> = {
   fullName: "full name",
@@ -115,10 +116,14 @@ export function renderReply(
     const fields = state.evidence
       .filter((item) => item.outcome === "match")
       .map((item) => item.field);
+    const unclearDate =
+      facts.identity?.dateOfBirth && normalizeDateOfBirth(facts.identity.dateOfBirth) === null;
     const conflicts = state.evidence
-      .filter((item) => item.outcome === "mismatch")
+      .filter(
+        (item) => item.outcome === "mismatch" && !(unclearDate && item.field === "dateOfBirth"),
+      )
       .map((item) => fieldLabels[item.field]);
-    return `${empathy}${mixed}To protect claim information, I need to verify at least three different identity details.${conflicts.length ? ` Please check your ${conflicts.join(", ")}; the supplied details did not match.` : fields.length ? ` ${fields.length} of the required 3 details have matched.` : ""} You can provide ${[
+    return `${empathy}${mixed}To protect claim information, I need to verify at least three different identity details.${unclearDate ? " I couldn't interpret your date of birth as a valid, unambiguous date. Please spell out the month and include the day and full year." : ""}${conflicts.length ? ` Please check your ${conflicts.join(", ")}; the supplied details did not match.` : fields.length ? ` ${fields.length} of the required 3 details have matched.` : ""} You can provide ${[
       "fullName",
       "dateOfBirth",
       "phone",

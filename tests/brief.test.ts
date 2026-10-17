@@ -2,6 +2,57 @@ import { expect, test } from "bun:test";
 import { sample, setup } from "./helpers/conversation.ts";
 import { DEFAULT_SOP_POLICY } from "../src/domain/conversation.ts";
 
+test("a naturally written birthday verifies without replacing the remembered claim month", async () => {
+  const { service } = await setup();
+  try {
+    const access = service.create();
+    const partial = await service.turn(access, {
+      requestId: "one",
+      text: "My name is Margaret Chen, policy POL-9921. Why was my January healthcare claim denied?",
+    });
+    expect(partial.view.verified).toBe(false);
+    const answer = await service.turn(access, {
+      requestId: "two",
+      text: "My date of birth is March 15, 1985, and my SSN last four is 4472.",
+    });
+    expect(answer.error).toBeNull();
+    expect(answer.view.phase).toBe("PROCESS_CASE");
+    expect(answer.view.verified).toBe(true);
+    expect(answer.reply).toContain("CL-2048");
+    expect(answer.reply).not.toContain("1985");
+  } finally {
+    await service.close();
+  }
+});
+
+test.each(["03/04/1985", "February 30, 1985"])(
+  "unclear or invalid DOB asks for clarification and accepts a later correction: %s",
+  async (dateOfBirth) => {
+    const { service } = await setup();
+    try {
+      const access = service.create();
+      const first = await service.turn(access, {
+        requestId: "one",
+        text: `My name is Margaret Chen, policy POL-9921, DOB is ${dateOfBirth}, SSN last four 4472. Why was my January healthcare claim denied?`,
+      });
+      expect(first.error).toBeNull();
+      expect(first.view.verified).toBe(false);
+      expect(first.view.phase).toBe("VERIFY_ID");
+      expect(first.reply).toContain("spell out the month");
+      expect(first.reply).not.toContain("CL-2048");
+      const corrected = await service.turn(access, {
+        requestId: "two",
+        text: "My date of birth is March 15, 1985.",
+      });
+      expect(corrected.error).toBeNull();
+      expect(corrected.view.verified).toBe(true);
+      expect(corrected.reply).toContain("CL-2048");
+    } finally {
+      await service.close();
+    }
+  },
+);
+
 test("brief single-turn example crosses verified gates through real Pi, answers from facts, then skips email", async () => {
   const { service, traces } = await setup();
   try {
